@@ -22,7 +22,7 @@ immutable Poly{T<:Number}
         new(n, m, syms, c, alpha, deg)
     end
 
-    # we allow a constant polynomial without a prober symbol basis
+    # we allow a constant polynomial without a proper symbol basis
     Poly(c::T) = new(0, 1, Symbols([""]), [c], Array(Int, 1, 0), 0)
 end
 
@@ -36,14 +36,8 @@ zero{T<:Number}(::Poly{T}) = Poly(zero(T))
 one{T<:Number}(::Type{Poly{T}}) = Poly(one(T))
 one{T<:Number}(::Poly{T}) = Poly(one(T))
 
-function promote_rule{S<:Number,T<:Number}(::Type{S}, ::Type{Poly{T}} )
-    Poly{promote_type(S,T)}
-end
-
-function promote_rule{S<:Number,T<:Number}(::Type{Poly{S}}, ::Type{Poly{T}} )
-    Poly{promote_type(S,T)}
-end
-
+promote_rule{S<:Number,T<:Number}(::Type{S}, ::Type{Poly{T}}) = Poly{promote_type(S,T)}
+promote_rule{S<:Number,T<:Number}(::Type{Poly{S}}, ::Type{Poly{T}}) = Poly{promote_type(S,T)}
 promote_rule(::Type{Rational}, ::Type{Int}) = Rational
 
 function show{T}(io::IO, p::Poly{T})

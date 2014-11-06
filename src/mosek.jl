@@ -119,15 +119,16 @@ function solve_mosek(prob::MomentProb, scaling=false)
     solutionsummary(task,MSK_STREAM_MSG)
 
     # Get status information about the solution
-    prosta = getprosta(task,MSK_SOL_ITR)
     solsta = getsolsta(task,MSK_SOL_ITR)
 
-    #return getbarxj(task, MSK_SOL_ITR, 1)
-
     if solsta == MSK_SOL_STA_OPTIMAL
-        return ([1, gety(task, MSK_SOL_ITR)], getprimalobj(task, MSK_SOL_ITR), "Optimal")
+        X = [ symm(getbarxj(task, MSK_SOL_ITR, j), int(sqrt(size(prob.mom[j],1)))) for j=1:length(prob.mom) ]
+        y = [1, gety(task, MSK_SOL_ITR)]
+        return (X, y, getprimalobj(task, MSK_SOL_ITR), "Optimal")
     elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
-        return ([1, gety(task, MSK_SOL_ITR)], getprimalobj(task, MSK_SOL_ITR), "Near optimal")
+        X = [ symm(getbarxj(task, MSK_SOL_ITR, j), int(sqrt(size(prob.mom[j],1)))) for j=1:length(prob.mom) ]
+        y = [1, gety(task, MSK_SOL_ITR)]
+        return (X, y, getprimalobj(task, MSK_SOL_ITR), "Near optimal")
     elseif solsta == MSK_SOL_STA_DUAL_INFEAS_CER
         error("Primal or dual infeasibility.\n")
     elseif solsta == MSK_SOL_STA_PRIM_INFEAS_CER
@@ -137,12 +138,23 @@ function solve_mosek(prob::MomentProb, scaling=false)
     elseif solsta == MSK_SOL_STA_NEAR_PRIM_INFEAS_CER
         error("Primal or dual infeasibility.\n")
     elseif solsta == MSK_SOL_STA_UNKNOWN
-        println("Unknown solution status")
-        return ([1, gety(task, MSK_SOL_ITR)],  getprimalobj(task, MSK_SOL_ITR), "Unknown")
+        X = [ symm(getbarxj(task, MSK_SOL_ITR, j), int(sqrt(size(prob.mom[j],1)))) for j=1:length(prob.mom) ]
+        y = [1, gety(task, MSK_SOL_ITR)]
+        return (X, y, getprimalobj(task, MSK_SOL_ITR), "Unknown")
     else
         error("Other solution status")
     end
-
 end
 
 trilind(k::Vector{Int}, n::Int) = Int[i + (j-1)*(n-1) - (j-1)*(j-2)>>1 for (i,j) = zip(ind2sub((n, n), k)...) ]
+
+function symm{T<:Number}(x::Array{T,1}, n::Int)
+    X = zeros(n,n)
+    k = 0
+    for j=1:n
+        X[j:n,j] = x[k + (1:n-j+1)]
+        k += n-j+1
+    end
+
+    Symmetric(X,:L)
+end
