@@ -1,6 +1,11 @@
-using Polyopt, MATLAB
-
-function write(matfile::ASCIIString, prob::MomentProb)
+# Generate a SeDuMi compatible formulation of 'prob'.
+#
+# Basic usage:
+#   At, b, c, K = Polopt.sedumi(prob)
+#
+# The data can written to a .mat file using MATLAB.jl:
+#   MATLAB.write_matfile(matfile; c = c, At = At, b = b, K = K)
+function sedumi(prob::MomentProb)
 
     numcon = length(prob.obj) - 1
     barvardim = Int[ sqrt(size(prob.mom[k],1)) for k=1:length(prob.mom) ]
@@ -23,7 +28,7 @@ function write(matfile::ASCIIString, prob::MomentProb)
     val  = Array(Float64,0)
     for j=1:length(prob.eq)
         k = prob.eq[j].colptr[1]:prob.eq[j].colptr[2]-1
-        append!(subj, Solver.trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j])
+        append!(subj, Polyopt.trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j])
         append!(val, -float64(prob.eq[j].nzval[k]))
     end
 
@@ -36,22 +41,18 @@ function write(matfile::ASCIIString, prob::MomentProb)
         for i=1:numcon
             k = prob.eq[j].colptr[i+1]:prob.eq[j].colptr[i+2]-1
             append!(subi, i*ones(Int, length(k)))
-            append!(subj, Solver.trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j])
+            append!(subj, Polyopt.trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j])
             append!(val, float64(prob.eq[j].nzval[k]))
         end
     end
     At = [sparse(subj,subi,val,numvar,numcon), At[:,2:end]]
     At = (At')'
 
-    MATLAB.write_matfile(matfile;
-                         c  = c,
-                         At = At,
-                         b  = b,
-                         K  = Dict( "f" => float(numvar), "s" => float(barvardim')) )
+    K  = Dict( "f" => float(numvar), "s" => float(barvardim'))
+    At, b, c, K
 end
 
 function offdiag_scale(A::AbstractArray)
     n = int(sqrt(size(A,1)))
     spdiagm(vec(2 - eye(n)))*A
 end
-

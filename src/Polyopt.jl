@@ -15,6 +15,7 @@ end
 
 include("mosek.jl")
 include("latex.jl")
+include("sedumi.jl")
 
 # compute all monomials of degree 'deg' or less
 function monomials_unsorted{T<:Number}(deg::Int, vars::Array{Poly{T},1})
