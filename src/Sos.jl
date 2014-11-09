@@ -2,15 +2,26 @@ module Sos
 export issos
 using Polyopt
 
+eps = 10e-9
+
+function issos{T<:Number}(p::Poly{T})
+    issos(p,eps)
+end
+
 function issos{T<:Number}(p::Poly{T},eps::Float64)
     
     order = int(p.deg / 2); 
     prob = momentprob(order,p)
     xx, yy, objval, solsta = solve_mosek(prob);
-    abs(objval) < eps
+    gramMatrix = xx[1]
+
+    cnstTerm = evalpoly(p,vec(zeros(1,p.n)));
+    lowerBndSos = cnstTerm+objval
+    gramMatrix.data[1,1] = cnstTerm
+
+    (lowerBndSos > -eps, gramMatrix, Polyopt.basis(order,variables(p.syms)))
     
 end
-
 
 function parse_dual(xx::Array{Any})
 
@@ -31,8 +42,6 @@ function parse_dual(xx::Array{Any})
     end
 
 end
-
-
 
 end
 
