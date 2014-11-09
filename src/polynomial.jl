@@ -1,6 +1,6 @@
 import Base: show, *, -, +, isless, ==, convert, conj, truncate, zero, one, promote_rule, A_mul_B!
 
-export variables,Poly
+export variables,Poly,evalpoly
 
 immutable Symbols
     names :: Array{ASCIIString,1}
