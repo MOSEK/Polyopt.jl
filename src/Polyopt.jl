@@ -32,8 +32,16 @@ end
 
 monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1}) = sort!(monomials_unsorted(deg, vars))
 
+function basis{T<:Number}(order::Int, vars::Array{Poly{T},1})
+    v = monomials(order, vars)
+end
+  
+function basis{T<:Number}(order::Int, vars::Array{Poly{T},1}, p::Poly{T})
+    v = monomials(order - (p.deg+1) >> 1, vars)
+end
+
 function moment(order::Int, syms::Symbols)
-    v = monomials(order, variables(syms))
+    v = basis(order, variables(syms))
     v*v'
 end
 
@@ -43,7 +51,7 @@ function moment(order::Int, syms::Symbols, I::Array{Int})
 end
 
 function moment{T<:Number}(order::Int, syms::Symbols, p::Poly{T})
-    v = monomials(order - (p.deg+1) >> 1, variables(syms))
+    v = basis(order, variables(syms),p)
     p*v*v'
 end
 
