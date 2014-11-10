@@ -41,7 +41,7 @@ function basis{T<:Number}(order::Int, vars::Array{Poly{T},1}, p::Poly{T})
 end
 
 function moment(order::Int, syms::Symbols)
-    v = basis(order, variables(syms))
+    v = monomials(order, variables(syms))
     v*v'
 end
 
@@ -51,7 +51,7 @@ function moment(order::Int, syms::Symbols, I::Array{Int})
 end
 
 function moment{T<:Number}(order::Int, syms::Symbols, p::Poly{T})
-    v = basis(order, variables(syms),p)
+    v = monomials(order - (p.deg+1) >> 1, variables(syms))
     p*v*v'
 end
 
