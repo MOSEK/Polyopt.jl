@@ -1,10 +1,4 @@
-using Base.Test
-
 let
-
-    using Polyopt
-    using Sos
-
     eps = 10e-5;
 
     function check_decomp(f,gramMatrix,basis)
