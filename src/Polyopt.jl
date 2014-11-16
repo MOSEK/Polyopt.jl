@@ -13,7 +13,7 @@ immutable MomentProb{T<:Number}
     eq    :: Array{Any,1}
 end
 
-include("mosek.jl")
+include("solver_mosek.jl")
 include("latex.jl")
 include("sedumi.jl")
 
