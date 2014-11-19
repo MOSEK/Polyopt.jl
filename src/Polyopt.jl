@@ -1,6 +1,6 @@
 module Polyopt
 
-export MomentProb, momentprob, momentprob_chordalembedding, solve_mosek
+export MomentProb, momentprob, momentprob_chordalembedding, solve_mosek,basis,vectorize,monomials
 
 include("polynomial.jl")
 include("cliques.jl")
@@ -13,7 +13,7 @@ immutable MomentProb{T<:Number}
     eq    :: Array{Any,1}
 end
 
-include("mosek.jl")
+include("solver_mosek.jl")
 include("latex.jl")
 include("sedumi.jl")
 
