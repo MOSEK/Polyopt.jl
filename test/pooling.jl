@@ -17,7 +17,7 @@ let
     obj = dot([c14, c24, c35, c36, c45, c46], [x14, x24, x35, x36, x45, x46])
     prob = momentprob(order, obj, [qual_bnd, cap_bnd, flow_bnd], [flow_eq,blend_eq])
 
-    X, y, objval, solsta = solve_mosek(prob)
+    X, t, y, solsta = solve_mosek(prob)
 
     @test norm(y[1:8]-[1,0,1/3,0,1/3,0,1/3,1]) < 1e-4
 end

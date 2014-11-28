@@ -1,6 +1,6 @@
 module Polyopt
 
-export MomentProb, momentprob, momentprob_chordalembedding, solve_mosek
+export MomentProb, momentprob, momentprob_chordalembedding, solve_mosek, solve_mosek2, monomials
 
 include("polynomial.jl")
 include("cliques.jl")

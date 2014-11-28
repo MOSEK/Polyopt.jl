@@ -8,10 +8,12 @@ using Mosek
 #
 # We formulate the dual problem for MOSEK
 #
-# maximize    -sum_j dot(prob.mom[j][:,1], Xj)
-# subject to   sum_j dot(prob.mom[j][:,i], Xj) = prob.obj[i],  i=2,...,length(prob.obj)
+# maximize     t
+# subject to   sum_j dot(prob.mom[j][:,1], Xj) = prob.obj[1] - t
+#              sum_j dot(prob.mom[j][:,i], Xj) = prob.obj[i], i=2,...,length(prob.obj)
 #              Xj is PSD, j=1,...,length(prob.mom)
-function solve_mosek(prob::MomentProb, scaling=false)
+#
+function solve_mosek(prob::MomentProb)
 
     printstream(msg::String) = print(msg)
 
@@ -20,7 +22,7 @@ function solve_mosek(prob::MomentProb, scaling=false)
     putstreamfunc(task,MSK_STREAM_LOG,printstream)
 
     # The momemt problem is in dual form, so we dualize it
-    numcon = length(prob.obj) - 1
+    numcon = length(prob.obj)
     numbarvar = length(prob.mom)
     barvardim = Int[ sqrt(size(prob.mom[k],1)) for k=1:numbarvar ]
 
@@ -30,47 +32,34 @@ function solve_mosek(prob::MomentProb, scaling=false)
     for k=1:length(prob.eq)
         eqidx[k+1] = eqidx[k] + eqdim[k]*(eqdim[k]+1)>>1
     end
-    numvar = eqidx[ end ]
+    numvar = 1 + eqidx[ end ]
 
     # Append 'numcon' empty constraints.
     appendcons(task, int32(numcon))
 
-    # find norm of each row in (A, b)
-    norm_rows = ones(numcon)
-    if scaling
-        for i=1:numcon
-            norm_rows[i] = max(norm_rows[i], abs(prob.obj[i+1]))
-            for j=1:length(prob.mom)
-                norm_rows[i] = max(norm_rows[i], norm(prob.mom[j].nzval[prob.mom[j].colptr[i+1]:prob.mom[j].colptr[i+2]-1], Inf))
-            end
+    # add free variables from equality constraints
+    appendvars(task, int32(numvar))
 
-            for j=1:length(prob.eq)
-                norm_rows[i] = max(norm_rows[i], norm(prob.eq[j].nzval[prob.eq[j].colptr[i+1]:prob.eq[j].colptr[i+2]-1], Inf))
-            end
-        end
+    putvarboundslice(task, 1, numvar+1,
+                     [ MSK_BK_FR::Int32 for i in 1:numvar ],
+                     [ -Inf             for i in 1:numvar ],
+                     [ +Inf             for i in 1:numvar ])
+
+
+    putcj(task, 1, 1.0)
+    for j=1:length(prob.eq)
+        k = prob.eq[j].colptr[1]:prob.eq[j].colptr[2]-1
+        subj = trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j] + 1
+        putclist(task, subj, -float64(prob.eq[j].nzval[k]))
     end
 
-    # add free variables from equality constraints
-    if numvar > 0
-        appendvars(task, int32(numvar))
+    putaij(task, 1, 1, 1.0)
 
-        putvarboundslice(task, 1, numvar+1,
-                         [ MSK_BK_FR::Int32 for i in 1:numvar ],
-                         [ -Inf             for i in 1:numvar ],
-                         [ +Inf             for i in 1:numvar ])
-
-        for j=1:length(prob.eq)
-            k = prob.eq[j].colptr[1]:prob.eq[j].colptr[2]-1
-            subj = trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j]
-            putclist(task, subj, -float64(prob.eq[j].nzval[k])/norm_rows[subj])
-        end
-
-        for j=1:length(prob.eq)
-            for i=1:numcon
-                k = prob.eq[j].colptr[i+1]:prob.eq[j].colptr[i+2]-1
-                subj = trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j]
-                putaijlist(task, i*ones(Int, length(subj)), subj, float64(prob.eq[j].nzval[k])/norm_rows[i])
-            end
+    for j=1:length(prob.eq)
+        for i=1:numcon
+            k = prob.eq[j].colptr[i]:prob.eq[j].colptr[i+1]-1
+            subj = trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j] + 1
+            putaijlist(task, i*ones(Int, length(subj)), subj, float64(prob.eq[j].nzval[k]))
         end
     end
 
@@ -78,32 +67,19 @@ function solve_mosek(prob::MomentProb, scaling=false)
     appendbarvars(task, int32(barvardim))
 
     bkc = Int32[ MSK_BK_FX for k=1:numcon ]
-    blc = float64(prob.obj[2:end])./norm_rows
-    buc = float64(prob.obj[2:end])./norm_rows
+    blc = float64(prob.obj)
+    buc = float64(prob.obj)
 
     # Set the bounds on constraints.
     putconboundslice(task, 1, numcon+1, bkc, blc, buc)
-
-    # Add objective
-    for j=1:numbarvar
-        nj = int64(barvardim[j])
-        k = prob.mom[j].colptr[1]:prob.mom[j].colptr[2]-1
-        subk, subl = ind2sub( (nj, nj), prob.mom[j].rowval[k] )
-        cj = appendsparsesymmat(task,
-                                int32(nj),
-                                int32(subk),
-                                int32(subl),
-                                float64(-prob.mom[j].nzval[k]))
-        putbarcj(task, j, [cj], [1.0])
-    end
 
     # Add constraints
     for i=1:numcon
         for j=1:numbarvar
             nj = int64(barvardim[j])
-            k = prob.mom[j].colptr[i+1]:prob.mom[j].colptr[i+2]-1
+            k = prob.mom[j].colptr[i]:prob.mom[j].colptr[i+1]-1
             subk, subl = ind2sub( (nj, nj), prob.mom[j].rowval[k] )
-            aij = appendsparsesymmat(task, int32(nj), int32(subk), int32(subl), float64(prob.mom[j].nzval[k])/norm_rows[i])
+            aij = appendsparsesymmat(task, int32(nj), int32(subk), int32(subl), float64(prob.mom[j].nzval[k]))
             putbaraij(task, int32(i), int32(j), [aij], [1.0])
         end
     end
@@ -123,12 +99,14 @@ function solve_mosek(prob::MomentProb, scaling=false)
 
     if solsta == MSK_SOL_STA_OPTIMAL
         X = [ symm(getbarxj(task, MSK_SOL_ITR, j), int(sqrt(size(prob.mom[j],1)))) for j=1:length(prob.mom) ]
-        y = [1, gety(task, MSK_SOL_ITR)]
-        return (X, y, getprimalobj(task, MSK_SOL_ITR), "Optimal")
+        t = getxxslice(task, MSK_SOL_ITR, 1, 2)[1]
+        y = gety(task, MSK_SOL_ITR)
+        return (X, t, y, "Optimal")
     elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
         X = [ symm(getbarxj(task, MSK_SOL_ITR, j), int(sqrt(size(prob.mom[j],1)))) for j=1:length(prob.mom) ]
-        y = [1, gety(task, MSK_SOL_ITR)]
-        return (X, y, getprimalobj(task, MSK_SOL_ITR), "Near optimal")
+        t = getxxslice(task, MSK_SOL_ITR, 1, 2)[1]
+        y = gety(task, MSK_SOL_ITR)
+        return (X, t, y, "Near optimal")
     elseif solsta == MSK_SOL_STA_DUAL_INFEAS_CER
         error("Primal or dual infeasibility.\n")
     elseif solsta == MSK_SOL_STA_PRIM_INFEAS_CER
@@ -139,8 +117,9 @@ function solve_mosek(prob::MomentProb, scaling=false)
         error("Primal or dual infeasibility.\n")
     elseif solsta == MSK_SOL_STA_UNKNOWN
         X = [ symm(getbarxj(task, MSK_SOL_ITR, j), int(sqrt(size(prob.mom[j],1)))) for j=1:length(prob.mom) ]
-        y = [1, gety(task, MSK_SOL_ITR)]
-        return (X, y, getprimalobj(task, MSK_SOL_ITR), "Unknown")
+        t = getxxslice(task, MSK_SOL_ITR, 1, 2)[1]
+        y = gety(task, MSK_SOL_ITR)
+        return (X, t, y, "Unknown")
     else
         error("Other solution status")
     end
@@ -156,5 +135,6 @@ function symm{T<:Number}(x::Array{T,1}, n::Int)
         k += n-j+1
     end
 
-    Symmetric(X,:L)
+    full(Symmetric(X,:L))
 end
+
