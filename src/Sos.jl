@@ -46,14 +46,15 @@ function sosprog{S}(obj::Poly{S}, pineq::Array{Constraint,1}, peq::Array{Constra
     end
 
     degreeCert = degreeCert + mod(degreeCert,2)
-   
+    order = int(degreeCert/2);
     v = monomials(degreeCert, variables(obj.syms))
+    
     l = length(v)
     imap = indexmap(v)
 
     p = vectorize(obj, l, imap)
     mom = Array(Any, length(pineq)+1)
-    mom[1] = vectorize(moment(int(degreeCert/2), obj.syms), l, imap)
+    mom[1] = vectorize(moment(order, obj.syms), l, imap)
 
     for k=1:length(pineq) 
        basis = computebasis(pineq[k])
@@ -66,8 +67,8 @@ function sosprog{S}(obj::Poly{S}, pineq::Array{Constraint,1}, peq::Array{Constra
         momeq[k] = vectorize(peq[k].p*basis*basis', l, imap)
     end
 
-    basisCert = monomials(int(degreeCert/2), variables(obj.syms))
-    SosProg(MomentProb(degreeCert, v,  p, mom, momeq),basisCert,pineq,peq,obj)
+    basisCert = monomials(order, variables(obj.syms))
+    SosProg(MomentProb(order, v,  p, mom, momeq),basisCert,pineq,peq,obj)
 
 end
 
@@ -114,7 +115,6 @@ function parse_dual(x,prog::SosProg)
 
     xpsd = x[1]
     xfree = x[2]
-    println(typeof(xpsd))
     pineq = prog.pineq
     peq = prog.peq
     
