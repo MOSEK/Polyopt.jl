@@ -170,9 +170,6 @@ function momentprob_chordal{S,T,U,V,W}(order::Int, cliques::Array{Array{Int,1},1
     MomentProb(order, v,  p, mom, momeq)
 end
 
-momentprob_chordal{S,T}(order::Int, cliques::Array{Array{Int,1},1}, obj::Poly{S}, pineq::Array{Poly{T},1}, pineq_index::Array{Int,1}) =
-   lasserre_chordal(order, cliques, obj, pineq, pineq_index, Poly{Int}[], Array{Int}[], Poly{Int}[], Poly{Int}[])
-
 function correlative_sparsity{S,T}(obj::Poly{S}, p::Array{Poly{T},1})
     A = eye(Int,obj.n,obj.n)
 
