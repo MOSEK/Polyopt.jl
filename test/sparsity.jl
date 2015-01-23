@@ -53,11 +53,14 @@ end
 
 # The regular chordal embedding always includes the diagonal of A.
 # This version filters out the 1x1 cliques corresponding to such diagonal terms if they are not used.
+# It also filters out cliques that does not contain the entire diagonal
 function chordal_embedding_new{Tv<:Number,Ti<:Int}(A::SparseMatrixCSC{Tv,Ti})
     cliques = chordal_embedding(A)
     c = Array{Int,1}[]
     for ci=cliques
-        if length(ci) > 1 || norm(A[:,ci]) > 0.0
+        Ai = A[ci,ci]
+        if minimum(diag(Ai)) > 0
+        #if length(ci) > 1 && minimum(diag(Ai)) > 0 && (length(ci) > 1 || norm(A[:,ci]) > 0.0
             push!(c, ci)
         end
     end
@@ -65,12 +68,14 @@ function chordal_embedding_new{Tv<:Number,Ti<:Int}(A::SparseMatrixCSC{Tv,Ti})
 end
 
 x, z = variables(["x", "z"])
-f = 2*x^4 + 2*x^3*z - x^2*z^2 + 5*z^4
+#f = 2*x^4 + 2*x^3*z - x^2*z^2 + 5*z^4
 
-prob = momentprob(2, f)
+f = z^2*x^10+2*z^3*x^9+z^4*x^8+2*z^2*x^8+2*z^3*x^7+z^2*x^6
+
+prob = momentprob(f.deg >> 1, f)
 X, t, y, solsta = solve_mosek(prob)
 
-v = monomials(2,[x,z])
+v = monomials(f.deg >> 1,[x,z])
 @test approxzero( f - t -dot(v,X[1]*v) )
 
 println("f: ", f)
