@@ -5,8 +5,6 @@ using Base.Test
 
 approxzero{T<:Number}(p::Polyopt.Poly{T}, threshold=1e-6) = (norm(p.c, Inf) < threshold)
 
-
-#function sparsity{S}(f::Poly{S})
 function sparsity(d, f)
 
     v=monomials(d, variables(f.syms))
@@ -27,6 +25,37 @@ function sparsity(d, f)
 
     sparse(A)
 end
+
+function sparsity(d, f)
+
+    v=monomials(d, variables(f.syms))
+    l=length(v)
+    M=v*v'
+
+    A = zeros(l,l)
+    for j=1:l
+        for i=1:l
+
+            for k=1:f.m
+                if M[i,j].alpha[1,:] == f.alpha[k,:]
+                    A[i,j] = 1
+                    break
+                end
+            end
+
+            for k=1:l
+                if M[i,j] == v[k]^2
+                    A[i,j] = 1
+                    break
+                end
+            end
+
+        end
+    end
+
+    sparse(A)
+end
+
 
 function moment_new(order::Int, syms::Symbols, I::Array{Int})
     v = monomials(order, variables(syms))[I]
@@ -86,6 +115,7 @@ println("cliques for sparsity:", cliques)
 prob2 = momentprob_chordal_new(f.deg >> 1, cliques, f)
 
 X2, t2, y2, solsta2 = solve_mosek(prob2)
+
 end
 
 if false
@@ -142,10 +172,8 @@ v = monomials(f.deg >> 1,[x])
 println("f: ", f)
 
 println("full moment-matrix:\n", v*v')
-#A = sparsity(f.deg >> 1, f)
-A = sparse([1 1 1 1; 1 1 1 1; 1 1 1 0; 1 1 0 1])
+A = sparsity(f.deg >> 1, f)
 println("Sparsity of used monominals:\n", full(A))
-
 
 cliques = chordal_embedding_new(A)
 
