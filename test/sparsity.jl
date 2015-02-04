@@ -14,6 +14,7 @@ function sparsity(d, f)
     A = zeros(l,l)
     for j=1:l
         for i=1:l
+
             for k=1:f.m
                 if M[i,j].alpha[1,:] == f.alpha[k,:]
                     A[i,j] = 1
@@ -23,33 +24,17 @@ function sparsity(d, f)
         end
     end
 
-    sparse(A)
-end
-
-function sparsity(d, f)
-
-    v=monomials(d, variables(f.syms))
-    l=length(v)
-    M=v*v'
-
-    A = zeros(l,l)
-    for j=1:l
-        for i=1:l
-
-            for k=1:f.m
-                if M[i,j].alpha[1,:] == f.alpha[k,:]
-                    A[i,j] = 1
-                    break
+    for k=1:l
+        if norm(A[:,k]) > 0
+            A[k,k] = 1
+            for j=1:l
+                for i=j+1:l
+                    if v[k]^2 == v[i]*v[j]
+                        A[i,j] = 1
+                        A[j,i] = 1
+                    end
                 end
             end
-
-            for k=1:l
-                if M[i,j] == v[k]^2
-                    A[i,j] = 1
-                    break
-                end
-            end
-
         end
     end
 
@@ -182,6 +167,8 @@ println("cliques for sparsity:", cliques)
 prob2 = momentprob_chordal_new(f.deg >> 1, cliques, f)
 
 X2, t2, y2, solsta2 = solve_mosek(prob2)
+
+@test approxzero(f - t2  - sum([dot(v[cliques[i]],X2[i]*v[cliques[i]]) for i=1:length(cliques)]))
 
 end
 
