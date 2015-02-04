@@ -32,6 +32,8 @@ function sparsity(d, f)
                     if v[k]^2 == v[i]*v[j]
                         A[i,j] = 1
                         A[j,i] = 1
+                        A[i,i] = 1   # also include the diagonal elements for (Aij. Aji)
+                        A[j,j] = 1
                     end
                 end
             end
