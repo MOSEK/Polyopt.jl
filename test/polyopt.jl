@@ -57,6 +57,7 @@ let
     @test approxzero( f - t - dot(v1,X[1]*v1) - g*dot(v2,X[2]*v2) )
 end
 
+
 # Motzkin polynomial
 # XXX: MOSEK cannot solve this instance
 #let

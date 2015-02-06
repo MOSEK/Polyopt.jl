@@ -58,13 +58,29 @@ end
 
 linear_index(imap::Dict{Array{Int,2},Int}, p::Poly) = Int[ imap[p.alpha[i,:]] for i=1:p.m ]
 
-function vectorize{T<:Number}(p::Poly{T}, l::Int, imap::Dict{Array{Int,2},Int})
-    a = zeros(T, l)
+function vectorize{T<:Number}(p::Poly{T}, imap::Dict{Array{Int,2},Int})
+    a = zeros(T, length(imap))
     a[linear_index(imap,p) ] = p.c
     a
 end
 
-function vectorize{T<:Number}(M::Array{Poly{T},2}, l::Int, imap::Dict{Array{Int,2},Int})
+function inverse_indexmap{T<:Number}(v::Array{Poly{T},1}, imap::Dict{Array{Int,2},Int})
+
+    lu = binomial(v[end].n + v[end].deg >> 1, v[end].n)
+    u  = v[1:lu]
+
+    y = Array(Array{(Int64,Int64),1},length(v))
+    for j=1:length(y) y[j] = [] end
+
+    for j=1:lu
+        for i=j:lu
+            push!(y[ imap[(u[i]*u[j]).alpha] ], (i,j) )
+        end
+    end
+    y
+end
+
+function vectorize{T<:Number}(M::Array{Poly{T},2}, imap::Dict{Array{Int,2},Int})
     m, n = size(M)
     m == n || throw(DimensionMismatch("Matrix is not square: dimensions are $(size(M))"))
     subi = Int[]
@@ -83,7 +99,7 @@ function vectorize{T<:Number}(M::Array{Poly{T},2}, l::Int, imap::Dict{Array{Int,
             push!(val, v...)
         end
     end
-    A = sparse(subi, subj, val, m*m, l)
+    A = sparse(subi, subj, val, m*m, length(imap))
 end
 
 function momentprob{S,T,U,V,W}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},1}, peq::Array{Poly{U},1}, ineq::Array{Poly{V},1}, eq::Array{Poly{W},1})
@@ -93,28 +109,28 @@ function momentprob{S,T,U,V,W}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},1}
 
     obj.deg <= 2*order || error("obj has degree higher than 2*order")
 
-    p = vectorize(obj, l, imap)
+    p = vectorize(obj, imap)
     mom = Array(Any, length(pineq)+length(ineq)+1)
-    mom[1] = vectorize(moment(order, obj.syms), l, imap)
+    mom[1] = vectorize(moment(order, obj.syms), imap)
     for k=1:length(pineq)
        pineq[k].deg <= 2*order || error("pineq[$(k)] has degree higher than 2*order")
-       mom[k+1] = vectorize(moment(order, pineq[k].syms, pineq[k]), l, imap)
+       mom[k+1] = vectorize(moment(order, pineq[k].syms, pineq[k]), imap)
     end
 
     for k=1:length(ineq)
         ineq[k].deg <= 2*order || error("ineq[$(k)] has degree higher than 2*order")
-        mom[k+length(pineq)+1] = sparse(vectorize(ineq[k], l, imap)')
+        mom[k+length(pineq)+1] = sparse(vectorize(ineq[k], imap)')
     end
 
     momeq = Array(Any, length(peq)+length(eq))
     for k=1:length(peq)
         peq[k].deg <= 2*order || error("peq[$(k)] has degree higher than 2*order")
-        momeq[k] = vectorize(moment(order, peq[k].syms, peq[k]), l, imap)
+        momeq[k] = vectorize(moment(order, peq[k].syms, peq[k]), imap)
     end
 
     for k=1:length(eq)
         eq[k].deg <= 2*order || error("eq[$(k)] has degree higher than 2*order")
-        momeq[k+length(peq)] = sparse(vectorize(eq[k], l, imap)')
+        momeq[k+length(peq)] = sparse(vectorize(eq[k], imap)')
     end
 
     MomentProb(order, v,  p, mom, momeq)
@@ -135,36 +151,36 @@ function momentprob_chordal{S,T,U,V,W}(order::Int, cliques::Array{Array{Int,1},1
                                        ineq::Array{Poly{V},1}, eq::Array{Poly{W},1})
 
     v = monomials(2*order, variables(obj.syms))
-    l = length(v)
+    #l = length(v)
     imap = indexmap(v)
 
     obj.deg <= 2*order || error("obj has degree higher than 2*order")
 
-    p = vectorize(obj, l, imap)
+    p = vectorize(obj, imap)
     mom = Array(Any, length(pineq) + length(cliques) + length(ineq))
     for k=1:length(cliques)
-        mom[k] = vectorize(moment(order, obj.syms, cliques[k]), l, imap)
+        mom[k] = vectorize(moment(order, obj.syms, cliques[k]), imap)
     end
 
     for k=1:length(pineq)
         pineq[k].deg <= 2*order || error("pineq[$(k)] has degree higher than 2*order")
-        mom[length(cliques)+k] = vectorize(moment(order, pineq[k].syms, pineq[k], cliques[pineq_index[k]]), l, imap)
+        mom[length(cliques)+k] = vectorize(moment(order, pineq[k].syms, pineq[k], cliques[pineq_index[k]]), imap)
     end
 
     for k=1:length(ineq)
         ineq[k].deg <= 2*order || error("ineq[$(k)] has degree higher than 2*order")
-        mom[length(cliques)+length(pineq)+k] = sparse(vectorize(ineq[k], l, imap)')
+        mom[length(cliques)+length(pineq)+k] = sparse(vectorize(ineq[k], imap)')
     end
 
     momeq = Array(Any, length(peq)+length(eq))
     for k=1:length(peq)
         peq[k].deg <= 2*order || error("peq[$(k)] has degree higher than 2*order")
-        momeq[k] = vectorize(moment(order, peq[k].syms, peq[k], cliques[peq_index[k]]), l, imap)
+        momeq[k] = vectorize(moment(order, peq[k].syms, peq[k], cliques[peq_index[k]]), imap)
     end
 
     for k=1:length(eq)
         eq[k].deg <= 2*order || error("eq[$(k)] has degree higher than 2*order")
-        momeq[length(peq)+k] = sparse(vectorize(eq[k], l, imap)')
+        momeq[length(peq)+k] = sparse(vectorize(eq[k], imap)')
     end
 
     MomentProb(order, v,  p, mom, momeq)
