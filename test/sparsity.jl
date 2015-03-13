@@ -7,11 +7,12 @@ approxzero{T<:Number}(p::Polyopt.Poly{T}, threshold=1e-6) = (norm(p.c, Inf) < th
 
 function sparsity(d, f)
 
-    v = monomials(d, variables(f.syms))
+    v = monomials(d + mod(d,2), variables(f.syms))
     imap  = indexmap(v)
     iimap = inverse_indexmap(v, imap)
 
-    n = binomial(v[end].n + v[end].deg >> 1, v[end].n)
+    #n = binomial(v[end].n + v[end].deg >> 1, v[end].n)
+    n = binomial(v[end].n + int(v[end].deg/2), v[end].n)
     A = zeros(Int, n, n)
 
     # stack of monomials still to be added
@@ -39,21 +40,26 @@ function sparsity(d, f)
 
             println("Adding $(v[vk]) as $(v[i]) * $(v[j]) to A")
             A[i,j] = A[j,i] = 1
-
+            println("M:\n", v[1:n]*v[1:n]')
             println("A:\n", full(A))
             # fill the clique formed by monotome adjancency, madj_A(vk)
-            madj = i - 1 + find(A[i:n,j])
-            println("madj: ", v[i]*v[madj])
-            for k=1:length(madj)
 
-                uk  = v[i]*v[ madj[k] ]
-                iuk = imap[ uk.alpha ]
-                println("Checking to push $(uk) to stack")
-                # Add uk to stack, if not already added
-                if !labeled[ iuk ] && !instack[ iuk ]
-                    println("pushed $(uk) to stack")
-                    push!(stack, iuk)
-                    instack[ iuk ] = true
+            aj = A[j:n, j]          # insert A[j,j]
+            aj[1] = aj[i-j+1] = 1   # insert A[i,j]
+            madj = j - 1 + find(aj)
+            println("madj: ", v[madj])
+            println("clique fill-in:\n", v[madj]*v[madj]')
+            for k=1:length(madj)
+                for l=k:length(madj)
+                    uk  = v[ madj[k] ] * v[ madj[l] ]
+                    iuk = imap[ uk.alpha ]
+                    println("Checking to push $(uk) to stack")
+                    # Add uk to stack, if not already added
+                    if !labeled[ iuk ] && !instack[ iuk ]
+                        println("pushed $(uk) to stack")
+                        push!(stack, iuk)
+                        instack[ iuk ] = true
+                    end
                 end
             end
         end
@@ -96,7 +102,6 @@ end
 function chordal_embedding_new{Tv<:Number,Ti<:Int}(A::SparseMatrixCSC{Tv,Ti})
 
     idx = find(diag(A) .> 0)
-    idx = [1:size(A,1)]
     cliques = chordal_embedding(A[idx,idx], [1:length(idx)])
     Array{Int,1}[ idx[c] for c=cliques ]
 
@@ -105,7 +110,6 @@ end
 if false
 x, z = variables(["x", "z"])
 f = 2*x^4 + 2*x^3*z - x^2*z^2 + 5*z^4
-
 #f = z^2*x^10+2*z^3*x^9+z^4*x^8+2*z^2*x^8+2*z^3*x^7+z^2*x^6
 
 prob = momentprob(f.deg >> 1, f)
@@ -156,37 +160,6 @@ X2, t2, y2, solsta2 = solve_mosek(prob2)
 
 end
 
-
-if true
-
-x, = variables(["x"])
-f = x^6 + x + 100
-
-prob = momentprob(f.deg >> 1, f)
-X, t, y, solsta = solve_mosek(prob)
-
-v = monomials(f.deg >> 1, variables(f.syms))
-@test approxzero( f - t -dot(v,X[1]*v) )
-
-println("f: ", f)
-
-println("full moment-matrix:\n", v*v')
-A = sparsity(f.deg, f)
-println("Sparsity of used monominals:\n", full(A))
-
-cliques = chordal_embedding_new(A)
-
-println("cliques for sparsity:", cliques)
-
-prob2 = momentprob_chordal_new(f.deg >> 1, cliques, f)
-
-X2, t2, y2, solsta2 = solve_mosek(prob2)
-
-@test approxzero(f - t2  - sum([dot(v[cliques[i]],X2[i]*v[cliques[i]]) for i=1:length(cliques)]))
-
-end
-
-
 if false
 
 x1, x2, x3 = variables(["x1", "x2", "x3"])
@@ -209,6 +182,33 @@ cliques = chordal_embedding_new(A)
 println("cliques for sparsity:", cliques)
 
 prob2 = momentprob_chordal_new(f.deg >> 1, cliques, f)
+
+X2, t2, y2, solsta2 = solve_mosek(prob2)
+
+@test approxzero(f - t2  - sum([dot(v[cliques[i]],X2[i]*v[cliques[i]]) for i=1:length(cliques)]))
+
+end
+
+if true
+
+x, = variables(["x"])
+f = x^6 + x^5 + 1
+
+prob = momentprob( int(f.deg/2), f)
+X, t, y, solsta = solve_mosek(prob)
+v = monomials( f.deg >> 1, variables(f.syms))
+@test approxzero( f - t -dot(v,X[1]*v) )
+
+println("f: ", f)
+
+A = sparsity( f.deg, f)
+println("Sparsity of used monominals:\n", full(A))
+
+cliques = chordal_embedding_new(A)
+
+println("cliques for sparsity:", cliques)
+
+prob2 = momentprob_chordal_new( int(f.deg/2), cliques, f)
 
 X2, t2, y2, solsta2 = solve_mosek(prob2)
 
