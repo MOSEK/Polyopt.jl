@@ -66,9 +66,8 @@ end
 
 function inverse_indexmap{T<:Number}(v::Array{Poly{T},1}, imap::Dict{Array{Int,2},Int})
 
-    lu = binomial(v[end].n + v[end].deg >> 1, v[end].n)
+    lu = binomial(v[end].n + round(Int,v[end].deg/2), v[end].n)
     u  = v[1:lu]
-
     y = Array(Array{(Int64,Int64),1},length(v))
     for j=1:length(y) y[j] = [] end
 

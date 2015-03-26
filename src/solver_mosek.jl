@@ -35,22 +35,21 @@ function solve_mosek(prob::MomentProb)
     numvar = 1 + eqidx[ end ]
 
     # Append 'numcon' empty constraints.
-    appendcons(task, int32(numcon))
+    appendcons(task, Int32(numcon))
 
     # add free variables from equality constraints
-    appendvars(task, int32(numvar))
+    appendvars(task, Int32(numvar))
 
     putvarboundslice(task, 1, numvar+1,
-                     [ MSK_BK_FR::Int32 for i in 1:numvar ],
-                     [ -Inf             for i in 1:numvar ],
-                     [ +Inf             for i in 1:numvar ])
-
+                     round(Int32, [ MSK_BK_FR  for i in 1:numvar ]),
+                     [ -Inf       for i in 1:numvar ],
+                     [ +Inf       for i in 1:numvar ])
 
     putcj(task, 1, 1.0)
     for j=1:length(prob.eq)
         k = prob.eq[j].colptr[1]:prob.eq[j].colptr[2]-1
         subj = trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j] + 1
-        putclist(task, subj, -float64(prob.eq[j].nzval[k]))
+        putclist(task, subj, -map(Float64,prob.eq[j].nzval[k]))
     end
 
     putaij(task, 1, 1, 1.0)
@@ -59,16 +58,16 @@ function solve_mosek(prob::MomentProb)
         for i=1:numcon
             k = prob.eq[j].colptr[i]:prob.eq[j].colptr[i+1]-1
             subj = trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j] + 1
-            putaijlist(task, i*ones(Int, length(subj)), subj, float64(prob.eq[j].nzval[k]))
+            putaijlist(task, i*ones(Int, length(subj)), subj, map(Float64,prob.eq[j].nzval[k]))
         end
     end
 
     # Append matrix variables of sizes in 'BARVARDIM'.
-    appendbarvars(task, int32(barvardim))
+    appendbarvars(task, round(Int32,barvardim))
 
     bkc = Int32[ MSK_BK_FX for k=1:numcon ]
-    blc = float64(prob.obj)
-    buc = float64(prob.obj)
+    blc = map(Float64,prob.obj)
+    buc = map(Float64,prob.obj)
 
     # Set the bounds on constraints.
     putconboundslice(task, 1, numcon+1, bkc, blc, buc)
@@ -76,11 +75,11 @@ function solve_mosek(prob::MomentProb)
     # Add constraints
     for i=1:numcon
         for j=1:numbarvar
-            nj = int64(barvardim[j])
+            nj = Int64(barvardim[j])
             k = prob.mom[j].colptr[i]:prob.mom[j].colptr[i+1]-1
             subk, subl = ind2sub( (nj, nj), prob.mom[j].rowval[k] )
-            aij = appendsparsesymmat(task, int32(nj), int32(subk), int32(subl), float64(prob.mom[j].nzval[k]))
-            putbaraij(task, int32(i), int32(j), [aij], [1.0])
+            aij = appendsparsesymmat(task, Int32(nj), round(Int32,subk), round(Int32,subl), map(Float64,prob.mom[j].nzval[k]))
+            putbaraij(task, Int32(i), Int32(j), [aij], [1.0])
         end
     end
 
@@ -88,7 +87,7 @@ function solve_mosek(prob::MomentProb)
     putobjsense(task,MSK_OBJECTIVE_SENSE_MAXIMIZE)
 
     # Write .task file
-    #writetask(task, "polyopt.task")
+    writetask(task, "polyopt.task")
 
     # Solve the problem and print summary
     optimize(task)

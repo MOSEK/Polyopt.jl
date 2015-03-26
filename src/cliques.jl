@@ -1,36 +1,37 @@
-using Base.LinAlg.CHOLMOD
+using Base.SparseMatrix.CHOLMOD
 
-for Ti in (:Int32,:Int64)
+for Ti in CHOLMOD.IndexTypes
     @eval begin
-        function chm_analyze_ordering{Tv<:CHOLMOD.CHMVTypes}(A::CHOLMOD.CholmodSparse{Tv,$Ti},
-                                                             ordering::Cint,
-                                                             Perm::Vector{$Ti})
-            Parent   = Array($Ti,A.c.m)
-            Post     = Array($Ti,A.c.m)
-            ColCount = Array($Ti,A.c.m)
-            First    = Array($Ti,A.c.m)
-            Level    = Array($Ti,A.c.m)
+        function chm_analyze_ordering{Tv<:CHOLMOD.VTypes}(A::CHOLMOD.Sparse{Tv,$Ti},
+                                                          ordering::Cint,
+                                                          Perm::Vector{$Ti})
+            s = unsafe_load(A.p)
+            Parent   = Array($Ti,s.nrow)
+            Post     = Array($Ti,s.nrow)
+            ColCount = Array($Ti,s.nrow)
+            First    = Array($Ti,s.nrow)
+            Level    = Array($Ti,s.nrow)
 
-            ccall((@CHOLMOD.chm_nm("analyze_ordering",$Ti),:libcholmod), Cint,
-                  (Ptr{CHOLMOD.c_CholmodSparse{Tv,$Ti}}, Cint, Ptr{$Ti}, Ptr{$Ti}, Csize_t,
+            ccall((@CHOLMOD.cholmod_name("analyze_ordering",$Ti),:libcholmod), Cint,
+                  (Ptr{CHOLMOD.C_Sparse{Tv,$Ti}}, Cint, Ptr{$Ti}, Ptr{$Ti}, Csize_t,
                    Ptr{$Ti}, Ptr{$Ti}, Ptr{$Ti},
                    Ptr{$Ti}, Ptr{$Ti}, Ptr{Uint8}),
-                   &A.c, ordering, Perm, C_NULL, zero(Csize_t), Parent, Post, ColCount, First, Level, CHOLMOD.cmn($Ti))
+                   A.p, ordering, Perm, C_NULL, zero(Csize_t), Parent, Post, ColCount, First, Level, CHOLMOD.common($Ti))
             Parent, Post, ColCount
         end
 
-        function chm_analyze_p{Tv<:CHOLMOD.CHMVTypes}(A::CholmodSparse{Tv,$Ti}, Perm::Vector{$Ti})
-            F = ccall((@CHOLMOD.chm_nm("analyze_p",$Ti),:libcholmod), Ptr{CHOLMOD.c_CholmodFactor{Tv,$Ti}},
-                      (Ptr{CHOLMOD.c_CholmodSparse{Tv,$Ti}}, Ptr{$Ti}, Ptr{$Ti}, Csize_t, Ptr{Uint8}),
-                      &A.c, Perm, C_NULL, zero(Csize_t), CHOLMOD.cmn($Ti))
-            CholmodFactor(F)
+        function chm_analyze_p{Tv<:CHOLMOD.VTypes}(A::CHOLMOD.Sparse{Tv,$Ti}, Perm::Vector{$Ti})
+            F = Factor(ccall((@CHOLMOD.cholmod_name("analyze_p",$Ti),:libcholmod), Ptr{CHOLMOD.C_Factor{Tv,$Ti}},
+                             (Ptr{CHOLMOD.C_Sparse{Tv,$Ti}}, Ptr{$Ti}, Ptr{$Ti}, Csize_t, Ptr{Uint8}),
+                              A.p, Perm, C_NULL, zero(Csize_t), CHOLMOD.common($Ti)))
+            F
         end
 
-        function chm_factorize_p!{Tv<:CHOLMOD.CHMVTypes}(A::CholmodSparse{Tv,$Ti}, beta::Tv, L::CholmodFactor{Tv,$Ti})
-             ccall((@CHOLMOD.chm_nm("factorize_p",$Ti),:libcholmod), Cint,
-                  (Ptr{CHOLMOD.c_CholmodSparse{Tv,$Ti}}, Ptr{Tv}, Ptr{$Ti}, Csize_t,
-                   Ptr{CHOLMOD.c_CholmodFactor{Tv,$Ti}}, Ptr{Uint8}),
-                   &A.c, &beta, C_NULL, zero(Csize_t), &L.c, CHOLMOD.cmn($Ti))
+        function chm_factorize_p!{Tv<:CHOLMOD.VTypes}(A::CHOLMOD.Sparse{Tv,$Ti}, beta::Tv, L::Factor{Tv,$Ti})
+             ccall((@CHOLMOD.cholmod_name("factorize_p",$Ti),:libcholmod), Cint,
+                  (Ptr{CHOLMOD.C_Sparse{Tv,$Ti}}, Ptr{Tv}, Ptr{$Ti}, Csize_t,
+                   Ptr{CHOLMOD.C_Factor{Tv,$Ti}}, Ptr{Uint8}),
+                   A.p, &beta, C_NULL, zero(Csize_t), L.p, CHOLMOD.common($Ti))
         end
 
     end
@@ -59,16 +60,20 @@ end
 
 function chordal_embedding{Tv<:Number,Ti<:Int}(A::SparseMatrixCSC{Tv,Ti}, Perm::Vector{Ti})
     m, n = size(A)
-    S = CholmodSparse(SparseMatrixCSC(m,n,A.colptr,A.rowval,zeros(length(A.nzval))))
+    S = CHOLMOD.Sparse(round(Float64,A))
+    
     F = chm_analyze_p(S, length(Perm)>0 ? Perm-1 : Perm)
     chm_factorize_p!(S, 1.0, F)
+    
+    s = unsafe_load(F.p)
+    p = round(Int64,[ unsafe_load(s.Perm, i) for i=1:s.n])
 
-    par, post, colcount = chm_analyze_ordering(S, F.c.ordering, F.Perm)
+    par, post, colcount = chm_analyze_ordering(S, s.ordering, p)
     ns, flag = pothen_sun(par+1, post+1, colcount)
 
     # extract cliques
     L = sparse(F)
-    [ sort(1+F.Perm[L.rowval[L.colptr[i]:L.colptr[i+1]-1]]) for i = find(flag .< 0) ]
+    [ sort(1+p[L.rowval[L.colptr[i]:L.colptr[i+1]-1]]) for i = find(flag .< 0) ]
 end
 
 # If no permutation is specified, use the CHOLMOD ordering

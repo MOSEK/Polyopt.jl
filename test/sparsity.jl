@@ -64,8 +64,8 @@ function sparsity(d, f)
             end
         end
 
-        println("PAUSED - PRESS ENTER")
-        readline(STDIN)
+        #println("PAUSED - PRESS ENTER")
+        #readline(STDIN)
     end
 
     sparse(A)
@@ -204,6 +204,7 @@ println("f: ", f)
 A = sparsity( f.deg, f)
 println("Sparsity of used monominals:\n", full(A))
 
+println("A:\n", full(A))
 cliques = chordal_embedding_new(A)
 
 println("cliques for sparsity:", cliques)
@@ -215,3 +216,5 @@ X2, t2, y2, solsta2 = solve_mosek(prob2)
 @test approxzero(f - t2  - sum([dot(v[cliques[i]],X2[i]*v[cliques[i]]) for i=1:length(cliques)]))
 
 end
+
+
