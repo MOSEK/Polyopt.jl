@@ -13,7 +13,7 @@ using Mosek
 #              sum_j dot(prob.mom[j][:,i], Xj) = prob.obj[i], i=2,...,length(prob.obj)
 #              Xj is PSD, j=1,...,length(prob.mom)
 #
-function solve_mosek(prob::MomentProb, tolrelgap=1e-8)
+function solve_mosek(prob::MomentProb, tolrelgap=1e-10)
 
     printstream(msg::String) = print(msg)
 
