@@ -77,22 +77,38 @@ end
 *(p::Poly, a::Number) = Poly(p.syms, p.alpha, p.c*a)
 *(a::Number, p::Poly) = *(p::Poly, a::Number)
 
-function +(p1::Poly, p2::Poly)
+function add(p1::Poly, p2::Poly) 
     p1, p2 = promote_poly(p1, p2)
-    simplify(Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, p2.c)))
+    Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, p2.c))
 end
 
-function -(p1::Poly, p2::Poly)
+function sub(p1::Poly, p2::Poly) 
     p1, p2 = promote_poly(p1, p2)
-    simplify(Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, -p2.c)))
+    Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, -p2.c))
 end
+
++(p1::Poly, p2::Poly) = simplify( add(p1, p2) )
+-(p1::Poly, p2::Poly) = simplify( sub(p1, p2) )
 
 function *{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
     p1, p2 = promote_poly(p1, p2)
     if p2.m == 1
         Poly(p1.syms, p1.alpha .+ p2.alpha, p1.c*p2.c[1])
-    else
-        sum(Poly{promote_type(S, T)}[ p1*Poly(p2.syms, p2.alpha[k,:], [p2.c[k]]) for k=1:p2.m ])
+    elseif p1.m == 1
+        Poly(p1.syms, p2.alpha .+ p1.alpha, p2.c*p1.c[1])
+    else    
+        if p1.m < p2.m
+            r = Poly(p1.syms, p2.alpha .+ p1.alpha[1,:], p2.c*p1.c[1])
+            for k=2:p1.m
+                r = add(r, Poly(p1.syms, p2.alpha .+ p1.alpha[k,:], p2.c*p1.c[k]))
+            end            
+        else
+            r = Poly(p1.syms, p1.alpha .+ p2.alpha[1,:], p1.c*p2.c[1])
+            for k=2:p2.m
+                r = add(r, Poly(p1.syms, p1.alpha .+ p2.alpha[k,:], p1.c*p2.c[k]))                
+            end                    
+        end
+        simplify(r)
     end
 end
 
@@ -100,7 +116,10 @@ function ^{T}(p::Poly{T}, a::Int)
     if a<0 error("power must be nonnegative") end
     if a==0 return Poly(p.syms, zeros(Int, 1, p.n), [one(T)]) end
     if p.n == 1 return Poly(p.syms, p.alpha*a, p.c.^a) end
-    prod([p for k=1:a])
+    
+    r = Poly(p)
+    for k=2:a r *= p end
+    r        
 end
 
 typealias MatOrVec{T} Union(Array{T,1},Array{T,2})
@@ -221,11 +240,11 @@ function isless{T<:Number}(p1::Poly{T}, p2::Poly{T})
     if max(p1.m, p2.m) > 1 return p1.deg < p2.deg end
 
     # otherwise use graded inverse lex-order for monomials
-    grilex_isless(vec(p1.alpha), vec(p2.alpha))
+    grilex_isless(p1.alpha, p2.alpha)
 end
 
 # graded inverse lexicographic order (lowest total order first, then reverse lex)
-function grilex_isless(a::Vector{Int}, b::Vector{Int})
+function grilex_isless(a::Array{Int}, b::Array{Int})
     i, j = sum(a), sum(b)
     i == j ? ~lexless(a, b) : i < j
 end

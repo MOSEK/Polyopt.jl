@@ -1,6 +1,6 @@
 module Polyopt
 
-export MomentProb, momentprob, momentprob_chordalembedding, solve_mosek, solve_mosek2, monomials
+export MomentProb, momentprob, momentprob_chordalembedding, solve_mosek, monomials
 
 include("polynomial.jl")
 include("cliques.jl")
@@ -17,20 +17,55 @@ include("solver_mosek.jl")
 include("latex.jl")
 include("sedumi.jl")
 
+function _merge_monomials{T<:Number}(a::Array{Poly{T},1}, b::Array{Poly{T},1})
+
+    n, m = length(a), length(b)
+    y = Array(Poly{T}, n + m)
+    
+    i, j, k = 1, 1, 1
+    
+    while (i <= n) && (j <= m)        
+        if a[i] <= b[j]
+            y[k] = a[i]
+            i += 1
+        else
+            y[k] = b[j]
+            j += 1        
+        end
+        k += 1
+    end
+    
+    if i <= n
+        y[k:n+m] = a[i:n]
+    else
+        y[k:n+m] = b[j:m]
+    end
+    
+    y
+end
+
 # compute all monomials of degree 'deg' or less
-function monomials_unsorted{T<:Number}(deg::Int, vars::Array{Poly{T},1})
-    if length(vars) == 1 return [ vars[1]^i for i=0:deg ] end
+function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
 
-    x, tail = vars[1], vars[2:end]
-    monoms = monomials_unsorted(deg, tail)
+    if length(vars) == 1        
+        monoms = Array(Poly{T}, deg+1)
+        monoms[1] = vars[1]^0
+        for k=1:deg            
+            monoms[k+1] = monoms[k] * vars[1] 
+        end
+    else
+        x, tail = vars[1], vars[2:end]
+        m = monomials(deg, tail)
+        monoms = m[:]
 
-    for i=1:deg
-        append!(monoms, [ x^i * m for m=monomials_unsorted(deg-i, tail) ])
+        t = x
+        for i=1:deg
+            monoms = _merge_monomials(monoms, monomials(deg-i, tail)*t)
+            t = t*x
+        end
     end
     monoms
 end
-
-monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1}) = sort!(monomials_unsorted(deg, vars))
 
 function moment(order::Int, syms::Symbols)
     v = monomials(order, variables(syms))
@@ -102,8 +137,8 @@ function vectorize{T<:Number}(M::Array{Poly{T},2}, imap::Dict{Array{Int,2},Int})
 end
 
 function momentprob{S,T,U,V,W}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},1}, peq::Array{Poly{U},1}, ineq::Array{Poly{V},1}, eq::Array{Poly{W},1})
+
     v = monomials(2*order, variables(obj.syms))
-    l = length(v)
     imap = indexmap(v)
 
     obj.deg <= 2*order || error("obj has degree higher than 2*order")
@@ -150,7 +185,6 @@ function momentprob_chordal{S,T,U,V,W}(order::Int, cliques::Array{Array{Int,1},1
                                        ineq::Array{Poly{V},1}, eq::Array{Poly{W},1})
 
     v = monomials(2*order, variables(obj.syms))
-    #l = length(v)
     imap = indexmap(v)
 
     obj.deg <= 2*order || error("obj has degree higher than 2*order")

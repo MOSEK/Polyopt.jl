@@ -13,7 +13,7 @@ using Mosek
 #              sum_j dot(prob.mom[j][:,i], Xj) = prob.obj[i], i=2,...,length(prob.obj)
 #              Xj is PSD, j=1,...,length(prob.mom)
 #
-function solve_mosek(prob::MomentProb)
+function solve_mosek(prob::MomentProb, tolrelgap=1e-8)
 
     printstream(msg::String) = print(msg)
 
@@ -86,6 +86,9 @@ function solve_mosek(prob::MomentProb)
     # Input the objective sense (minimize/maximize)
     putobjsense(task,MSK_OBJECTIVE_SENSE_MAXIMIZE)
 
+    putparam(task, "MSK_IPAR_NUM_THREADS", "8")
+    putparam(task, "MSK_DPAR_INTPNT_CO_TOL_REL_GAP", string(tolrelgap))
+    
     # Write .task file
     writetask(task, "polyopt.task")
 

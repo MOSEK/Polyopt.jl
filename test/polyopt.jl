@@ -4,11 +4,42 @@ approxzero{T<:Number}(p::Polyopt.Poly{T}, threshold=1e-6) = (norm(p.c, Inf) < th
 let
     x, z = variables(["x", "z"])
     f = 4*x^2 + x*z - 4*z^2 - 21//10*x^4 + 4*z^4 + 1//3*x^6
-
+    
+    # perturb problem to find global optimizer
+    f = f + 1e-5*dot(randn(2),[x,z])
+    
     prob = momentprob(3, f)
-    X, t, y, solsta = solve_mosek(prob)
+    X, t, y, solsta = solve_mosek(prob, 1e-10)
 
-    @test abs(t - (-1.0316)) < 1e-4
+    # test that (x, z) = y[2:3] is globally optimal 
+    @test abs(t - Polyopt.evalpoly(f, y[2:3])) < 1e-6
+end
+
+# gloptipoly example
+let
+    x1, x2, x3 = variables(["x1", "x2", "x3"])
+
+    # This is the Gloptipoly example.  We normalize it to 0 <= x1 <= 1, 0 <= x3 <= 1 below for stability reasons
+    #  f = -2*x1 + x2 - x3
+    # g1 = 24 - 20*x1 + 9*x2 - 13*x3 + 4*x1^2 - 4*x1*x2 + 4*x1*x3 + 2*x2^2 - 2*x2*x3 + 2*x3^2
+    # g2 = 4 - (x1 + x2 + x3)
+    # g3 = 6 - (3*x2 + x3)
+    
+    f = -2*2*x1 + x2 - 3*x3
+
+    # perturb problem to find global optimizer
+    f = f + 1e-4*dot(randn(3),[x1,x2,x3]) 
+    
+    g1 = (24 - 20*2*x1 + 9*x2 - 13*3*x3 + 4*4*x1^2 - 4*2*x1*x2 + 4*2*3*x1*x3 + 2*x2^2 - 2*3*x2*x3 + 2*9*x3^2)
+    g2 = (4 - (2*x1 + x2 + 3*x3))
+    g3 = (6 - (3*x2 + 3*x3))
+    
+    prob = momentprob(4, f, [g1, g2, g3, 1-x1, x1, x2, 1-x3, x3])
+    X, t, y, solsta = solve_mosek(prob, 1e-10)
+        
+    # test that (x1, x2, x3) = y[2:4] is globally optimal 
+    @test abs(t - Polyopt.evalpoly(f, y[2:4])) < 1e-6
+    @test all( [ Polyopt.evalpoly(g, y[2:4]) for g=[g1, g2, g3, 1-x1, x1, x2, 1-x3, x3] ] .> -1e-3 )
 end
 
 # determine if f(x,z) is can be written as a SOS
@@ -57,15 +88,3 @@ let
     @test approxzero( f - t - dot(v1,X[1]*v1) - g*dot(v2,X[2]*v2) )
 end
 
-
-# Motzkin polynomial
-# XXX: MOSEK cannot solve this instance
-#let
-#    x, z = variables(["x", "z"])
-#
-#    f = x^2*z^4 + x^4*z^2 - 3*x^2*z^2 + 1
-#
-#    prob = momentprob(3, f)
-#
-#    X, t, y, solsta = solve_mosek2(prob)
-#end
