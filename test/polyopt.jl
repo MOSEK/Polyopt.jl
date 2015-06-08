@@ -9,7 +9,7 @@ let
     f = f + 1e-5*dot(randn(2),[x,z])
     
     prob = momentprob(3, f)
-    X, t, y, solsta = solve_mosek(prob, 1e-10)
+    X, t, y, solsta = solve_mosek(prob)
 
     # test that (x, z) = y[2:3] is globally optimal 
     @test abs(t - Polyopt.evalpoly(f, y[2:3])) < 1e-6
@@ -19,12 +19,13 @@ end
 let
     x1, x2, x3 = variables(["x1", "x2", "x3"])
 
-    # This is the Gloptipoly example.  We normalize it to 0 <= x1 <= 1, 0 <= x3 <= 1 below for stability reasons
+    # This is the Gloptipoly example.  
     #  f = -2*x1 + x2 - x3
     # g1 = 24 - 20*x1 + 9*x2 - 13*x3 + 4*x1^2 - 4*x1*x2 + 4*x1*x3 + 2*x2^2 - 2*x2*x3 + 2*x3^2
     # g2 = 4 - (x1 + x2 + x3)
     # g3 = 6 - (3*x2 + x3)
     
+    # We normalize it to 0 <= x1 <= 1, 0 <= x3 <= 1 below for stability reasons
     f = -2*2*x1 + x2 - 3*x3
 
     # perturb problem to find global optimizer
@@ -35,7 +36,7 @@ let
     g3 = (6 - (3*x2 + 3*x3))
     
     prob = momentprob(4, f, [g1, g2, g3, 1-x1, x1, x2, 1-x3, x3])
-    X, t, y, solsta = solve_mosek(prob, 1e-10)
+    X, t, y, solsta = solve_mosek(prob)
         
     # test that (x1, x2, x3) = y[2:4] is globally optimal 
     @test abs(t - Polyopt.evalpoly(f, y[2:4])) < 1e-6
