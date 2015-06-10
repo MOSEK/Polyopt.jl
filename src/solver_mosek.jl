@@ -15,13 +15,13 @@ using Mosek
 #              Xj is PSD, j=1,...,length(prob.mom)
 #              Zk is symmetric but free,  k=1,...,length(prob.eq)   
 #
-function solve_mosek(prob::MomentProb, tolrelgap=1e-10, silent=false)
+function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
 
     printstream(msg::String) = print(msg)
 
     # Create a task object and attach log stream printer
     task = maketask()
-    if !silent  putstreamfunc(task,MSK_STREAM_LOG,printstream)  end
+    if showlog  putstreamfunc(task,MSK_STREAM_LOG,printstream)  end
 
     # The momemt problem is in dual form, so we dualize it
     numcon = length(prob.obj)

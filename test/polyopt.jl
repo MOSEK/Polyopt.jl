@@ -85,20 +85,26 @@ let
     @test approxzero( f - t - dot(v1,X[1]*v1) - g*dot(v2,X[2]*v2) )
 end
 
-# Test duality for problem with equality constrained 
+# Test duality for problem with both inequality and equality constraints 
 let
     x1, x2 = variables(["x1", "x2"])
     f = x1 + x2  
-    h = [ x1^2 + x2^2 - 1, x1 - 1 ]
+    g = x1 - x2 
+    h = x1^2 + x2^2 - 1 
 
-    prob = momentprob(2, f, Polyopt.Poly{Int}[], h)
+    prob = momentprob(2, f, [g], [h])
     X, Z, t, y, solsta = solve_mosek(prob);
     
     u = monomials(2, [x1,x2])
     v = monomials(1, [x1,x2])
+    
+    # test optimality
     @test abs(t - Polyopt.evalpoly(f, y[2:3])) < 1e-4
-    @test norm([ Polyopt.evalpoly(hi, y[2:3]) for hi=h ], Inf) < 1e-4
-    @test approxzero(f - t - (dot(u, X[1]*u) + h[1]*dot(v, Z[1]*v) + h[2]*dot(v, Z[2]*v)))     
+    @test abs(Polyopt.evalpoly(h, y[2:3])) < 1e-4
+    @test Polyopt.evalpoly(g, y[2:3]) > -1e-4
+    
+    # test that f(x1,x2) - t - g(x1,x2)*s(x1,x2) - h(x1,x2)*w(x1,x2) is SOS,  where s1(x1,x2) = v'*X[2]*v is SOS, but w(x1,x2) = v'*Z[1]*z is not     
+    @test approxzero(f - t - (dot(u, X[1]*u) + g*dot(v, X[2]*v) + h*dot(v, Z[1]*v)))
 end    
 
 # Example 6.23 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
