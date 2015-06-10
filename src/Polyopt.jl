@@ -88,7 +88,7 @@ function moment{T<:Number}(order::Int, syms::Symbols, p::Poly{T}, I::Array{Int})
 end
 
 function indexmap{T<:Number}(v::Array{Poly{T},1})
-    Dict(zip([vi.alpha for vi=v],[1:length(v)]))
+    Dict( [(v[k].alpha, k) for k=1:length(v)] )
 end
 
 linear_index(imap::Dict{Array{Int,2},Int}, p::Poly) = Int[ imap[p.alpha[i,:]] for i=1:p.m ]

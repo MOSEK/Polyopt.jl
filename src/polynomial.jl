@@ -1,4 +1,4 @@
-import Base: show, *, -, +, isless, ==, convert, conj, truncate, zero, one, promote_rule, A_mul_B!
+import Base: show, *, -, +, isless, ==, convert, conj, truncate, zero, one, promote_rule, A_mul_B!, dot
 
 export variables
 
@@ -39,6 +39,10 @@ one{T<:Number}(::Poly{T}) = Poly(one(T))
 promote_rule{S<:Number,T<:Number}(::Type{S}, ::Type{Poly{T}}) = Poly{promote_type(S,T)}
 promote_rule{S<:Number,T<:Number}(::Type{Poly{S}}, ::Type{Poly{T}}) = Poly{promote_type(S,T)}
 promote_rule(::Type{Rational}, ::Type{Int}) = Rational
+
+dot(a::Poly, b::Poly) = a*b
+dot(a::Number, b::Poly) = a*b
+dot(b::Number, a::Poly) = a*b
 
 function show{T}(io::IO, p::Poly{T})
     if p.m == 0 print(io, zero(T)) end

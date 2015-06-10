@@ -3,29 +3,31 @@ using Mosek
 # The 'prob' structure specifies the moment problem
 #
 # minimize    prob.obj'*y
-# subject to  prob.mom[k]*y is PSD ,  k=1,...,length(prob.mom)
+# subject to  prob.mom[k]*y is PSD,  k=1,...,length(prob.mom)
+#             prob.eq[k]*y = 0,      k=1,...,length(prob.eq) 
 #             y[1] = 1
 #
 # We formulate the dual problem for MOSEK
 #
 # maximize     t
-# subject to   sum_j dot(prob.mom[j][:,1], Xj) = prob.obj[1] - t
-#              sum_j dot(prob.mom[j][:,i], Xj) = prob.obj[i], i=2,...,length(prob.obj)
+# subject to   sum_j dot(prob.mom[j][:,1], Xj) + sum_k dot(prb.eq[k][:,1], Zk)) = prob.obj[1] - t
+#              sum_j dot(prob.mom[j][:,i], Xj) + sum_k dot(prb.eq[k][:,1], Zk)) = prob.obj[i], i=2,...,length(prob.obj)
 #              Xj is PSD, j=1,...,length(prob.mom)
+#              Zk is symmetric but free,  k=1,...,length(prob.eq)   
 #
-function solve_mosek(prob::MomentProb, tolrelgap=1e-10)
+function solve_mosek(prob::MomentProb, tolrelgap=1e-10, silent=false)
 
     printstream(msg::String) = print(msg)
 
     # Create a task object and attach log stream printer
     task = maketask()
-    putstreamfunc(task,MSK_STREAM_LOG,printstream)
+    if !silent  putstreamfunc(task,MSK_STREAM_LOG,printstream)  end
 
     # The momemt problem is in dual form, so we dualize it
     numcon = length(prob.obj)
     numbarvar = length(prob.mom)
     barvardim = Int[ sqrt(size(prob.mom[k],1)) for k=1:numbarvar ]
-
+    
     eqdim = Int[ sqrt(size(prob.eq[k],1)) for k=1:length(prob.eq) ]
     eqidx = Array(Int, length(prob.eq)+1)
     eqidx[1] = 0
@@ -33,7 +35,7 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10)
         eqidx[k+1] = eqidx[k] + eqdim[k]*(eqdim[k]+1)>>1
     end
     numvar = 1 + eqidx[ end ]
-
+    
     # Append 'numcon' empty constraints.
     appendcons(task, Int32(numcon))
 
@@ -46,12 +48,6 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10)
                      [ +Inf       for i in 1:numvar ])
 
     putcj(task, 1, 1.0)
-    for j=1:length(prob.eq)
-        k = prob.eq[j].colptr[1]:prob.eq[j].colptr[2]-1
-        subj = trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j] + 1
-        putclist(task, subj, -map(Float64,prob.eq[j].nzval[k]))
-    end
-
     putaij(task, 1, 1, 1.0)
 
     for j=1:length(prob.eq)
@@ -99,29 +95,26 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10)
     # Get status information about the solution
     solsta = getsolsta(task,MSK_SOL_ITR)
 
+    X = [ symm(getbarxj(task, MSK_SOL_ITR, j), Int(sqrt(size(prob.mom[j],1)))) for j=1:length(prob.mom) ]
+    t = getxxslice(task, MSK_SOL_ITR, 1, 2)[1]
+    Z = [ symm(getxxslice(task, MSK_SOL_ITR, 2+eqidx[k], 2+eqidx[k+1]), eqdim[k]) for k=1:length(prob.eq) ]
+    Z = [ 0.5*(Zk + diagm(diag(Zk))) for Zk = Z ]
+
+    y = gety(task, MSK_SOL_ITR)
     if solsta == MSK_SOL_STA_OPTIMAL
-        X = [ symm(getbarxj(task, MSK_SOL_ITR, j), int(sqrt(size(prob.mom[j],1)))) for j=1:length(prob.mom) ]
-        t = getxxslice(task, MSK_SOL_ITR, 1, 2)[1]
-        y = gety(task, MSK_SOL_ITR)
-        return (X, t, y, "Optimal")
+        return (X, Z, t, y, "Optimal")
     elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
-        X = [ symm(getbarxj(task, MSK_SOL_ITR, j), int(sqrt(size(prob.mom[j],1)))) for j=1:length(prob.mom) ]
-        t = getxxslice(task, MSK_SOL_ITR, 1, 2)[1]
-        y = gety(task, MSK_SOL_ITR)
-        return (X, t, y, "Near optimal")
+        return (X, Z, t, y, "Near optimal")
     elseif solsta == MSK_SOL_STA_DUAL_INFEAS_CER
-        error("Primal or dual infeasibility.\n")
+        error("Dual infeasibility")
     elseif solsta == MSK_SOL_STA_PRIM_INFEAS_CER
-        error("Primal or dual infeasibility.\n")
+        error("Primal infeasibility")
     elseif solsta == MSK_SOL_STA_NEAR_DUAL_INFEAS_CER
-        error("Primal or dual infeasibility.\n")
+        error("Near dual infeasibility")
     elseif solsta == MSK_SOL_STA_NEAR_PRIM_INFEAS_CER
-        error("Primal or dual infeasibility.\n")
+        error("Near primal infeasibility")
     elseif solsta == MSK_SOL_STA_UNKNOWN
-        X = [ symm(getbarxj(task, MSK_SOL_ITR, j), int(sqrt(size(prob.mom[j],1)))) for j=1:length(prob.mom) ]
-        t = getxxslice(task, MSK_SOL_ITR, 1, 2)[1]
-        y = gety(task, MSK_SOL_ITR)
-        return (X, t, y, "Unknown")
+        return (X, Z, t, y, "Unknown")
     else
         error("Other solution status")
     end
