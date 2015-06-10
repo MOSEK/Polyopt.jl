@@ -136,7 +136,7 @@ typealias MatOrVec{T} Union(Array{T,1},Array{T,2})
 ==(p1::Poly, p2::Poly) = (p1-p2).m == 0
 
 conj(p::Poly) = Poly(p.syms, p.alpha, conj(p.c))
-convert{S<:Number,T<:Number}(::Type{Poly{S}}, a::T) = Poly{S}(convert(S,a))
+convert{S<:Number}(::Type{Poly{S}}, a::S) = Poly{S}(convert(S,a))
 isconst(p::Poly) = p.m == 1 && p.n == 0
 
 function A_mul_B!{S<:Number,T<:Number,}(alpha::Poly{S}, A::SparseMatrixCSC{S,Int}, x::Array{Poly{T},1}, beta::Poly{S}, y::Array{Poly{S},1})
