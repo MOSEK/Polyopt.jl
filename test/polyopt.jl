@@ -117,7 +117,7 @@ let
           x1, 3-x1,
           x2, 4-x2 ]
 
-    prob = momentprob(4, f, [g;])
+    prob = momentprob(4, f, g)
 
     X, Z, t, y, solsta = solve_mosek(prob)
     @test abs(t - Polyopt.evalpoly(f, y[2:3])) < 1e-6
