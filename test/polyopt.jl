@@ -154,5 +154,138 @@ let
     @test norm([ Polyopt.evalpoly(hi, y[2:4]) for hi=h ], Inf) < 1e-4 
 end
 
+# http://gamsworld.org/global/globallib/ex2_1_1.htm
+let
+    x1, x2, x3, x4, x5 = variables(["x1", "x2", "x3", "x4", "x5"])
 
+    f =  -0.5*(100*x1^2 + 100*x2^2 + 100*x3^2 + 100*x4^2 + 100*x5^2) + 42*x1 + 44*x2 + 45*x3 + 47*x4 + 47.5*x5
+    g = [40 - (20*x1 + 12*x2 + 11*x3 + 7*x4 + 4*x5), x1, 1-x1, x2, 1-x2, x3, 1-x3, x4, 1-x4, x5, 1-x5]
     
+    prob = momentprob(3, f, g)
+    X, Z, t, y, solsta = solve_mosek(prob);    
+    @test all( [ Polyopt.evalpoly(gi, y[2:6]) for gi=g ] .> -1e-4 )
+end
+
+# http://gamsworld.org/global/globallib/ex2_1_2.htm
+let
+    x1, x2, x3, x4, x5, x6 = variables(["x1", "x2", "x3", "x4", "x5", "x6"])
+    
+    f = -0.5*(x1*x1 + x2*x2 + x3*x3 + x4*x4 + x5*x5) - 10.5*x1 - 7.5*x2 - 3.5*x3 - 2.5*x4 - 1.5*x5 - 10*x6
+    g = [ 6.5 - (6*x1 + 3*x2 + 3*x3 + 2*x4 + x5), 20 - (10*x1 + 10*x3 + x6), x1, 1-x1, x2, 1-x2, x3, 1-x3, x4, 1-x4, x5, 1-x5, x6 ]
+    
+    prob = momentprob(2, f, g)
+    X, Z, t, y, solsta = solve_mosek(prob);
+    @test all( [ Polyopt.evalpoly(gi, y[2:7]) for gi=g ] .> -1e-4 )
+end
+
+# http://gamsworld.org/global/globallib/ex2_1_4.htm
+let
+    x1, x2, x3, x4, x5, x6 = variables(["x1", "x2", "x3", "x4", "x5", "x6"])
+    
+    f = (6.5*x1 - 0.5*x1*x1) - x2 - 2*x3 - 3*x4 - 2*x5 - x6
+    g = [ 16-(x1 + 2*x2 + 8*x3 + x4 + 3*x5 + 5*x6),
+          -1-(-8*x1 - 4*x2 - 2*x3 + 2*x4 + 4*x5 - x6),
+          24-(2*x1 + 0.5*x2 + 0.2*x3 - 3*x4 - x5 - 4*x6),
+          12-(0.2*x1 + 2*x2 + 0.1*x3 - 4*x4 + 2*x5 + 2*x6),
+           3-(-0.1*x1 - 0.5*x2 + 2*x3 + 5*x4 - 5*x5 + 3*x6),
+           x1, 1-x1, x2, x3, x4, 1-x4, x5, 1-x5, x6, 2-x6 ]
+           
+    prob = momentprob(2, f, g)
+    X, Z, t, y, solsta = solve_mosek(prob);
+    @test all( [ Polyopt.evalpoly(gi, y[2:7]) for gi=g ] .> -1e-4 )
+end
+ 
+# http://gamsworld.org/global/globallib/ex3_1_2.htm
+let 
+    x1, x2, x3, x4, x5 = variables(["x1", "x2", "x3", "x4", "x5"])
+ 
+    f = -40792.141 + 0.8356891*x1*x5 + 37.293239*x1 + 5.3578547*x3*x3 
+    g = [ 6.665593-(0.0056858*x2*x5 - 0.0022053*x3*x5 + 0.0006262*x1*x4),
+          85.334407-(0.0022053*x3*x5 - 0.0056858*x2*x5 - 0.0006262*x1*x4),
+          29.48751-(0.0071317*x2*x5 + 0.0021813*x3*x3 + 0.0029955*x1*x2),
+          -9.48751-(-0.0071317*x2*x5 - 0.0021813*x3*x3 - 0.0029955*x1*x2),
+          15.599039-(0.0047026*x3*x5 + 0.0019085*x3*x4 + 0.0012547*x1*x3),
+          -10.699039-((-0.0047026*x3*x5) - 0.0019085*x3*x4 - 0.0012547*x1*x3),
+          x1-78, 102-x1, x2-33, 45-x2, x3-27, 45-x3, x4-27, 45-x4, x5-27, 45-x5 ]
+
+    prob = momentprob(2, f, g)
+    X, Z, t, y, solsta = solve_mosek(prob);
+    @test all( [ Polyopt.evalpoly(gi, y[2:6]) for gi=g ] .> -1e-4 )
+end
+
+#http://gamsworld.org/global/globallib/ex9_2_3.htm
+if false
+let
+x1,x2,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17 = 
+    variables(["x1","x2","x4","x5","x6","x7","x8","x9","x10","x11","x12","x13","x14","x15","x16","x17"]) 
+
+f = -3*x1 - 3*x2 + 2*x4 + 2*x5 - 60
+g = [ 40-(x1 - 2*x2 + x4 + x5), 
+      x4, 50-x4, x5, 50-x5, x6, 200-x6, x7, 200-x7, x8, 200-x8, x9, 200-x9, 
+      x10, 200-x10, x11, 200-x11, x12, 200-x12, x13, 200-x13, x14, 200-x14, 
+      x15, 200-x15, x16, 200-x16, x17, 200-x17 ]
+h = [ 2*x1 - x4 + x6 + 10, 
+      2*x2 - x5 + x7 + 10, 
+      -x1 + x8 - 10, 
+       x1 + x9 - 20, 
+      -x2 + x10 - 10,
+       x2 + x11 - 20,
+       x6*x12,
+       x7*x13,
+       x8*x14,
+       x9*x15,
+       x10*x16,
+       x11*x17,
+       2*x1 - 2*x4 + 2*x12 - x14 + x15 + 40,
+       2*x2 - 2*x5 + 2*x13 - x16 + x17 + 40]
+       
+    prob = momentprob(2, f, g, h)
+    X, Z, t, y, solsta = solve_mosek(prob);
+end
+end
+
+#http://gamsworld.org/global/globallib/ex5_4_2.htm
+let 
+    x1,x2,x3,x4,x5,x6,x7,x8 = variables(["x1","x2","x3","x4","x5","x6","x7","x8"])
+
+    #f = x1 + x2 + x3 
+    #g = [ 400 - (x4 + x6),
+    #      300 - (-x4 + x5 + x7),
+    #      100 - (-x5 + x8),
+    #      83333.3333333333 - (x1 - x1*x6 + 833.333333333333*x4),
+    #      -(x2*x4 - x2*x7 - 1250*x4 + 1250*x5),
+    #      -1250000 - (x3*x5 - x3*x8 - 2500*x5),
+    #      x1-100, 10000-x1, 
+    #      x2-1000, 10000-x2, 
+    #      x3-1000, 10000-x3, 
+    #      x4-10, 1000-x4, 
+    #      x5-10, 1000-x5, 
+    #      x6-10, 1000-x6, 
+    #      x7-10, 1000-x7, 
+    #      x8-10, 1000-x8 ]
+
+    # rescale model to make it easier to solve
+    f = x1 + x2 + x3
+    g = [ 400/1000 - (x4 + x6),
+          300/1000 - (-x4 + x5 + x7),
+          100/1000 - (-x5 + x8),
+          .083333 - (0.01*x1 - 10*x1*x6 + 0.83333*x4),      
+          -(x2*x4 - x2*x7 - 0.125*x4 + 0.125*x5),
+          -0.125 - (x3*x5 - x3*x8 - 0.25*x5),
+          x1-100/10000, 1-x1, 
+          x2-1000/10000, 1-x2, 
+          x3-1000/10000, 1-x3, 
+          x4-10/1000, 1-x4, 
+          x5-10/1000, 1-x5, 
+          x6-10/1000, 1-x6, 
+          x7-10/1000, 1-x7, 
+          x8-10/1000, 1-x8 ]
+
+    prob = momentprob(3, f, g)
+    X, Z, t, y, solsta = solve_mosek(prob);
+    @test all( [ Polyopt.evalpoly(gi, y[2:9]) for gi=g ] .> -1e-4 )
+    
+    probc = momentprob_chordalembedding(3, f, g)
+    Xc, Zc, tc, yc, solstac = solve_mosek(probc);
+    @test all( [ Polyopt.evalpoly(gi, yc[2:9]) for gi=g ] .> -1e-4 )
+end

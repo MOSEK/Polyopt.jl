@@ -239,7 +239,7 @@ function momentprob_chordalembedding{S,T,U,V,W}(order::Int, obj::Poly{S},
                                                 pineq::Array{Poly{T},1}, peq::Array{Poly{U},1},
                                                 ineq::Array{Poly{V},1}, eq::Array{Poly{W},1})
 
-    C = correlative_sparsity(obj, [pineq, ineq, peq, eq])
+    C = correlative_sparsity(obj, [pineq; ineq; peq; eq])
     cliques = chordal_embedding(C)
 
     momentprob_chordal(order, cliques, obj,
