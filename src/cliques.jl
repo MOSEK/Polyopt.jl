@@ -62,6 +62,7 @@ function chordal_embedding{Tv<:Number,Ti<:Int}(A::SparseMatrixCSC{Tv,Ti}, Perm::
     m, n = size(A)
     S = CHOLMOD.Sparse(round(Float64,A))
     
+    Perm = [1:n;]
     F = chm_analyze_p(S, length(Perm)>0 ? Perm-1 : Perm)
     chm_factorize_p!(S, 1.0, F)
     
@@ -72,7 +73,7 @@ function chordal_embedding{Tv<:Number,Ti<:Int}(A::SparseMatrixCSC{Tv,Ti}, Perm::
     ns, flag = pothen_sun(par+1, post+1, colcount)
 
     # extract cliques
-    L = sparse(F)[p+1,p+1]
+    L = sparse(CHOLMOD.Sparse(F))
     Array{Int,1}[ sort(1+p[L.rowval[L.colptr[i]:L.colptr[i+1]-1]]) for i = find(flag .< 0) ]
 end
 

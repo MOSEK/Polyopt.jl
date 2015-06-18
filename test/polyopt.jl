@@ -194,7 +194,7 @@ let
     X, Z, t, y, solsta = solve_mosek(prob);
     @test all( [ Polyopt.evalpoly(gi, y[2:7]) for gi=g ] .> -1e-4 )
 end
- 
+  
 # http://gamsworld.org/global/globallib/ex3_1_2.htm
 let 
     x1, x2, x3, x4, x5 = variables(["x1", "x2", "x3", "x4", "x5"])
@@ -244,6 +244,51 @@ h = [ 2*x1 - x4 + x6 + 10,
 end
 end
 
+# http://gamsworld.org/global/globallib/ex3_1_1.htm
+let
+    x1, x2, x3, x4, x5, x6, x7, x8 = variables(["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"])
+    #f = x1 + x2 + x3
+    #g = [ 1 - (0.0025*x4 + 0.0025*x6),
+    #      1 - (-0.0025*x4 + 0.0025*x5 + 0.0025*x7),
+    #      1 - (-0.01*x5 + 0.01*x8),
+    #      83333.333 - (100*x1 - x1*x6 + 833.33252*x4),
+    #      -(x2*x4 - x2*x7 - 1250*x4 + 1250*x5),
+    #      -1250000 - (x3*x5 - x3*x8 - 2500*x5),
+    #      x1-100,  10000-x1, 
+    #      x2-1000, 10000-x2, 
+    #      x3-1000, 10000-x3,
+    #      x4-10,   1000-x4,                                    
+    #      x5-10,   1000-x5,                                    
+    #      x6-10,   1000-x6,                                    
+    #      x7-10,   1000-x7,                                    
+    #      x8-10,   1000-x8 ]                                    
+
+    # rescale model to make it easier to solve
+    f = x1 + x2 + x3
+    g = [ 1 - (2.5*x4 + 2.5*x6),
+          1 - (-2.5*x4 + 2.5*x5 + 2.5*x7),
+          1 - (-10*x5 + 10*x8),
+          0.08333 - (x1 - 10*x1*x6 + 0.83333*x4),
+          -(x2*x4 - x2*x7 - 0.1250*x4 + 0.125*x5),
+          -0.125 - (x3*x5 - x3*x8 - 0.25*x5),
+          x1-0.01, 1-x1, 
+          x2-0.1,  1-x2, 
+          x3-0.1,  1-x3,
+          x4-0.01, 1-x4,                                    
+          x5-0.01, 1-x5,                                    
+          x6-0.01, 1-x6,                                    
+          x7-0.01, 1-x7,                                    
+          x8-0.01, 1-x8 ]                                    
+
+    #prob = momentprob(3, f, g)
+    #X, Z, t, y, solsta = solve_mosek(prob);
+    #@test all( [ Polyopt.evalpoly(gi, y[2:9]) for gi=g ] .> -1e-4 )
+    
+    probc = momentprob_chordalembedding(3, f, g)
+    Xc, Zc, tc, yc, solstac = solve_mosek(probc);
+    @test all( [ Polyopt.evalpoly(gi, yc[2:9]) for gi=g ] .> -1e-4 )
+end
+
 #http://gamsworld.org/global/globallib/ex5_4_2.htm
 let 
     x1,x2,x3,x4,x5,x6,x7,x8 = variables(["x1","x2","x3","x4","x5","x6","x7","x8"])
@@ -281,11 +326,59 @@ let
           x7-10/1000, 1-x7, 
           x8-10/1000, 1-x8 ]
 
-    prob = momentprob(3, f, g)
-    X, Z, t, y, solsta = solve_mosek(prob);
-    @test all( [ Polyopt.evalpoly(gi, y[2:9]) for gi=g ] .> -1e-4 )
+    #prob = momentprob(3, f, g)
+    #X, Z, t, y, solsta = solve_mosek(prob);
+    #@test all( [ Polyopt.evalpoly(gi, y[2:9]) for gi=g ] .> -1e-4 )
     
     probc = momentprob_chordalembedding(3, f, g)
     Xc, Zc, tc, yc, solstac = solve_mosek(probc);
     @test all( [ Polyopt.evalpoly(gi, yc[2:9]) for gi=g ] .> -1e-4 )
 end
+
+let
+    x1,x2,x3,x4 = variables(["x1","x2","x3","x4"])
+
+    f = x1-x2+x3-x4 - (x1^3+x2^3+x3^3+x4^3) 
+    g = [-1-x1*x2, 1-x1*x2,
+        -1-x2*x3, 1-x2*x3,
+        -1-x3*x4, 1-x3*x4,
+        1-x1^2,
+        1-x2^2,
+        1-x3^2,
+        1-x4^2 ]
+
+    prob = momentprob(2, f, g)
+    X, Z, t, y, solsta = solve_mosek(prob);
+    @test all( [ Polyopt.evalpoly(gi, y[2:5]) for gi=g ] .> -1e-4 )
+     
+    K = Array{Int,1}[ [1,2], [2,3], [3,4] ]
+    
+    probc = Polyopt.momentprob_chordal(2, K, 
+                                       f,
+                                       g, [ 1, 1, 2, 2, 3, 3, 1, 2, 3, 3 ])
+
+    Xc, Zc, tc, yc, solstac = solve_mosek(probc);
+    @test all( [ Polyopt.evalpoly(gi, yc[2:5]) for gi=g ] .> -1e-4 )
+    
+    u1 = monomials(2, [x1,x2,x3,x4][K[1]])
+    u2 = monomials(2, [x1,x2,x3,x4][K[2]])
+    u3 = monomials(2, [x1,x2,x3,x4][K[3]])
+    v1 = monomials(1, [x1,x2,x3,x4][K[1]]) 
+    v2 = monomials(1, [x1,x2,x3,x4][K[2]]) 
+    v3 = monomials(1, [x1,x2,x3,x4][K[3]]) 
+     
+    r = dot(u1, Xc[1]*u1) + dot(u2, Xc[2]*u2) + dot(u3, Xc[3]*u3) + 
+        g[1]*dot(v1, Xc[4]*v1) +
+        g[2]*dot(v1, Xc[5]*v1) +
+        g[3]*dot(v2, Xc[6]*v2) +
+        g[4]*dot(v2, Xc[7]*v2) +
+        g[5]*dot(v3, Xc[8]*v3) +
+        g[6]*dot(v3, Xc[9]*v3) +
+        g[7]*dot(v1, Xc[10]*v1) +
+        g[8]*dot(v2, Xc[11]*v2) +
+        g[9]*dot(v3, Xc[12]*v3) +
+        g[10]*dot(v3, Xc[13]*v3)
+    
+    @test approxzero( f - t - r )
+end
+
