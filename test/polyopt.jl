@@ -1,5 +1,9 @@
+using Polyopt
+using Base.Test
+
 approxzero{T<:Number}(p::Polyopt.Poly{T}, threshold=1e-6) = (norm(p.c, Inf) < threshold)
 
+if false
 # example of unconstrained global optimization
 let
     x, z = variables(["x", "z"])
@@ -289,8 +293,10 @@ let
     @test all( [ Polyopt.evalpoly(gi, yc[2:9]) for gi=g ] .> -1e-4 )
 end
 
+end
+
 #http://gamsworld.org/global/globallib/ex5_4_2.htm
-let 
+#let 
     x1,x2,x3,x4,x5,x6,x7,x8 = variables(["x1","x2","x3","x4","x5","x6","x7","x8"])
 
     #f = x1 + x2 + x3 
@@ -333,8 +339,9 @@ let
     probc = momentprob_chordalembedding(3, f, g)
     Xc, Zc, tc, yc, solstac = solve_mosek(probc);
     @test all( [ Polyopt.evalpoly(gi, yc[2:9]) for gi=g ] .> -1e-4 )
-end
+#end
 
+if false
 let
     x1,x2,x3,x4 = variables(["x1","x2","x3","x4"])
 
@@ -381,4 +388,4 @@ let
     
     @test approxzero( f - t - r )
 end
-
+end

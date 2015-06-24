@@ -5,14 +5,14 @@ using Base.Test
 
 approxzero{T<:Number}(p::Polyopt.Poly{T}, threshold=1e-6) = (norm(p.c, Inf) < threshold)
 
-function sparsity(d, f)
+function sparsity{T<:Number}(d::Int, f::Polyopt.Poly{T})
 
     v = monomials(d + mod(d,2), variables(f.syms))
     imap  = indexmap(v)
     iimap = inverse_indexmap(v, imap)
 
     #n = binomial(v[end].n + v[end].deg >> 1, v[end].n)
-    n = binomial(v[end].n + int(v[end].deg/2), v[end].n)
+    n = binomial(v[end].n + round(Int,v[end].deg/2), v[end].n)
     A = zeros(Int, n, n)
 
     # stack of monomials still to be added
@@ -72,8 +72,6 @@ function sparsity(d, f)
 
 end
 
-
-
 function moment_new(order::Int, syms::Symbols, I::Array{Int})
     v = monomials(order, variables(syms))[I]
     v*v'
@@ -102,18 +100,18 @@ end
 function chordal_embedding_new{Tv<:Number,Ti<:Int}(A::SparseMatrixCSC{Tv,Ti})
 
     idx = find(diag(A) .> 0)
-    cliques = chordal_embedding(A[idx,idx], [1:length(idx)])
+    cliques = chordal_embedding(A[idx,idx], [1:length(idx);])
     Array{Int,1}[ idx[c] for c=cliques ]
 
 end
 
-if true
+if false
 x, z = variables(["x", "z"])
 
-f = 1 + x*z^4  + z^5 + x^3*z^3 + x^2*z^4 + x*z^5 + x^6 + z^6 
+f = 1 + x*z^4 + z^5 + x^3*z^3 + x^2*z^4 + x*z^5 + x^6 + z^6 
 
 prob = momentprob(f.deg >> 1, f)
-X, t, y, solsta = solve_mosek(prob)
+X, Z, t, y, solsta = solve_mosek(prob)
 
 v = monomials(f.deg >> 1, variables(f.syms))
 @test approxzero( f - t -dot(v,X[1]*v) )
@@ -129,14 +127,14 @@ println("cliques for sparsity:", cliques)
 
 prob2 = momentprob_chordal_new(f.deg >> 1, cliques, f)
 
-X2, t2, y2, solsta2 = solve_mosek(prob2)
+X2, Z2, t2, y2, solsta2 = solve_mosek(prob2)
 
-Z = zeros(X[1])
+K = zeros(X[1])
 for j=1:length(cliques)
-    Z[cliques[j],cliques[j]] += X2[j]
+    K[cliques[j],cliques[j]] += X2[j]
 end
 
-@test approxzero(f - t2 - dot(v,Z*v))
+@test approxzero(f - t2 - dot(v,K*v))
 
 end
 
@@ -147,7 +145,7 @@ x1, x2, x3 = variables(["x1", "x2", "x3"])
 f =  x1^4*x2^2*x3^2 + x1^2*x2^4*x3^2-2*x1^2*x2^2*x3^2+x3^2+x1^2*x2^2+x1^2*x2^2*x3^4
 
 prob = momentprob(f.deg >> 1, f)
-X, t, y, solsta = solve_mosek(prob)
+X, Z, t, y, solsta = solve_mosek(prob)
 
 v = monomials(f.deg >> 1, variables(f.syms))
 @test approxzero( f - t -dot(v,X[1]*v) )
@@ -163,15 +161,14 @@ println("cliques for sparsity:", cliques)
 
 prob2 = momentprob_chordal_new(f.deg >> 1, cliques, f)
 
-X2, t2, y2, solsta2 = solve_mosek(prob2)
+X2, Z2, t2, y2, solsta2 = solve_mosek(prob2)
 
-Z = zeros(X[1])
+K = zeros(X[1])
 for j=1:length(cliques)
-    Z[cliques[j],cliques[j]] += X2[j]
+    K[cliques[j],cliques[j]] += X2[j]
 end
 
-@test approxzero(f - t2 - dot(v,Z*v))
-
+@test approxzero(f - t2 - dot(v,K*v))
 
 end
 
@@ -182,7 +179,7 @@ x1, x2, x3 = variables(["x1", "x2", "x3"])
 f = - x3^2 - x1*x3^2 - x2*x3^2 + x3^3 + x1^2*x3^2 + x1*x2*x3^2 + x1*x3^3 + x2^2*x3^2 + x2*x3^3 + x3^4
 
 prob = momentprob(f.deg >> 1, f)
-X, t, y, solsta = solve_mosek(prob)
+X, Z, t, y, solsta = solve_mosek(prob)
 
 v = monomials(f.deg >> 1, variables(f.syms))
 #@test approxzero( f - t -dot(v,X[1]*v) )
@@ -200,26 +197,26 @@ println("cliques for sparsity:", cliques)
 
 prob2 = momentprob_chordal_new(f.deg >> 1, cliques, f)
 
-X2, t2, y2, solsta2 = solve_mosek(prob2)
+X2, Z2, t2, y2, solsta2 = solve_mosek(prob2)
 
-Z = zeros(X[1])
+K = zeros(X[1])
 for j=1:length(cliques)
-    Z[cliques[j],cliques[j]] += X2[j]
+    K[cliques[j],cliques[j]] += X2[j]
 end
 
-@test approxzero(f - t2 - dot(v,Z*v))
+@test approxzero(f - t2 - dot(v,K*v))
 
 #@test approxzero(f - t2  - sum([dot(v[cliques[i]],X2[i]*v[cliques[i]]) for i=1:length(cliques)]))
 
 end
 
-if false
+if true
 
 x, = variables(["x"])
 f = x^6 + x^5 + 1
 
 prob = momentprob( int(f.deg/2), f)
-X, t, y, solsta = solve_mosek(prob)
+X, Z, t, y, solsta = solve_mosek(prob)
 v = monomials( f.deg >> 1, variables(f.syms))
 @test approxzero( f - t -dot(v,X[1]*v) )
 
@@ -235,16 +232,16 @@ println("cliques for sparsity:", cliques)
 
 prob2 = momentprob_chordal_new( int(f.deg/2), cliques, f)
 
-X2, t2, y2, solsta2 = solve_mosek(prob2)
+X2, Z2, t2, y2, solsta2 = solve_mosek(prob2)
 
 @test approxzero(f - t2  - sum([dot(v[cliques[i]],X2[i]*v[cliques[i]]) for i=1:length(cliques)]))
 
-Z = zeros(4,4)
+K = zeros(4,4)
 for j=1:3
-    Z[cliques[j],cliques[j]] += X2[j]
+    K[cliques[j],cliques[j]] += X2[j]
 end
 
-@test approxzero(f - t2 - dot(v,Z*v))
+@test approxzero(f - t2 - dot(v,K*v))
 
 println("t=$(t), t2=$(t2)")
 end
