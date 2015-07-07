@@ -36,9 +36,6 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
     end
     numvar = 1 + eqidx[ end ]
     
-    # Append 'numcon' empty constraints.
-    appendcons(task, Int32(numcon))
-
     # add free variables from equality constraints
     appendvars(task, Int32(numvar))
 
@@ -48,36 +45,45 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
                      [ +Inf       for i in 1:numvar ])
 
     putcj(task, 1, 1.0)
-    putaij(task, 1, 1, 1.0)
-
-    for j=1:length(prob.eq)
-        for i=1:numcon
-            k = prob.eq[j].colptr[i]:prob.eq[j].colptr[i+1]-1
-            subj = trilind( prob.eq[j].rowval[k], eqdim[j] ) + eqidx[j] + 1
-            putaijlist(task, i*ones(Int, length(subj)), subj, map(Float64,prob.eq[j].nzval[k]))
-        end
-    end
 
     # Append matrix variables of sizes in 'BARVARDIM'.
     appendbarvars(task, round(Int32,barvardim))
 
-    bkc = Int32[ MSK_BK_FX for k=1:numcon ]
-    blc = map(Float64,prob.obj)
-    buc = map(Float64,prob.obj)
-
-    # Set the bounds on constraints.
-    putconboundslice(task, 1, numcon+1, bkc, blc, buc)
-
     # Add constraints
+    numconst = 1
+    appendcons(task, 1)
     for i=1:numcon
+        ai_is_nonzero = false 
         for j=1:numbarvar
-            nj = Int64(barvardim[j])
-            k = prob.mom[j].colptr[i]:prob.mom[j].colptr[i+1]-1
-            subk, subl = ind2sub( (nj, nj), prob.mom[j].rowval[k] )
-            aij = appendsparsesymmat(task, Int32(nj), round(Int32,subk), round(Int32,subl), map(Float64,prob.mom[j].nzval[k]))
-            putbaraij(task, Int32(i), Int32(j), [aij], [1.0])
+            nj = Int64(barvardim[j])            
+            k1, k2 = prob.mom[j].colptr[i], prob.mom[j].colptr[i+1]-1
+            if k2 >= k1
+                subk, subl = ind2sub( (nj, nj), prob.mom[j].rowval[k1:k2] )
+                aij = appendsparsesymmat(task, Int32(nj), round(Int32,subk), round(Int32,subl), map(Float64,prob.mom[j].nzval[k1:k2]))
+                putbaraij(task, Int32(numconst), Int32(j), [aij], [1.0])
+            
+                ai_is_nonzero = true
+            end
+        end
+        
+        for j=1:length(prob.eq)
+            k1, k2 = prob.eq[j].colptr[i], prob.eq[j].colptr[i+1]-1
+            if k2 >= k1
+                subj = trilind( prob.eq[j].rowval[k1:k2], eqdim[j] ) + eqidx[j] + 1
+                putaijlist(task, numconst*ones(Int, length(subj)), subj, map(Float64,prob.eq[j].nzval[k1:k2]))
+            
+                ai_is_nonzero = true
+            end
+        end
+        
+        if ai_is_nonzero
+            putconbound(task, numconst, MSK_BK_FX, prob.obj[i], prob.obj[i])
+            numconst = numconst + 1
+            appendcons(task, 1)
         end
     end
+    
+    putaij(task, 1, 1, 1.0)
 
     # Input the objective sense (minimize/maximize)
     putobjsense(task,MSK_OBJECTIVE_SENSE_MAXIMIZE)
@@ -106,13 +112,13 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
     elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
         return (X, Z, t, y, "Near optimal")
     elseif solsta == MSK_SOL_STA_DUAL_INFEAS_CER
-        error("Dual infeasibility")
+        return (X, Z, t, y, "Dual infeasibility")
     elseif solsta == MSK_SOL_STA_PRIM_INFEAS_CER
-        error("Primal infeasibility")
+        return (X, Z, t, y, "Primal infeasibility")
     elseif solsta == MSK_SOL_STA_NEAR_DUAL_INFEAS_CER
-        error("Near dual infeasibility")
+        return (X, Z, t, y, "Near dual infeasibility")
     elseif solsta == MSK_SOL_STA_NEAR_PRIM_INFEAS_CER
-        error("Near primal infeasibility")
+        return (X, Z, t, y, "Near primal infeasibility")
     elseif solsta == MSK_SOL_STA_UNKNOWN
         return (X, Z, t, y, "Unknown")
     else

@@ -3,7 +3,6 @@ using Base.Test
 
 approxzero{T<:Number}(p::Polyopt.Poly{T}, threshold=1e-6) = (norm(p.c, Inf) < threshold)
 
-if false
 # example of unconstrained global optimization
 let
     x, z = variables(["x", "z"])
@@ -158,6 +157,24 @@ let
     @test norm([ Polyopt.evalpoly(hi, y[2:4]) for hi=h ], Inf) < 1e-4 
 end
 
+# Example 8.8 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
+let
+    x1, x2, x3 = variables(["x1", "x2", "x3"]);
+
+    g1, g2 = x1^4 + (x1*x2-1)^2, x2^2*x3^2 + (x3^2-1)^2;
+    f = g1+g2;
+    g = [g1, g2, 1-x1^2, 1-x2^2, 1-x3^2];
+
+    prob = momentprob(2, f, g);
+    X, Z, t, y, solsta = solve_mosek(prob);
+
+    probc = momentprob_chordalembedding(3, f, g);
+    Xc, Zc, tc, yc, solstac = solve_mosek(probc);
+    
+    @test abs(t-tc) < 1e-6
+end    
+    
+    
 # http://gamsworld.org/global/globallib/ex2_1_1.htm
 let
     x1, x2, x3, x4, x5 = variables(["x1", "x2", "x3", "x4", "x5"])
@@ -223,28 +240,55 @@ let
 x1,x2,x4,x5,x6,x7,x8,x9,x10,x11,x12,x13,x14,x15,x16,x17 = 
     variables(["x1","x2","x4","x5","x6","x7","x8","x9","x10","x11","x12","x13","x14","x15","x16","x17"]) 
 
-f = -3*x1 - 3*x2 + 2*x4 + 2*x5 - 60
-g = [ 40-(x1 - 2*x2 + x4 + x5), 
-      x4, 50-x4, x5, 50-x5, x6, 200-x6, x7, 200-x7, x8, 200-x8, x9, 200-x9, 
-      x10, 200-x10, x11, 200-x11, x12, 200-x12, x13, 200-x13, x14, 200-x14, 
-      x15, 200-x15, x16, 200-x16, x17, 200-x17 ]
-h = [ 2*x1 - x4 + x6 + 10, 
-      2*x2 - x5 + x7 + 10, 
-      -x1 + x8 - 10, 
-       x1 + x9 - 20, 
-      -x2 + x10 - 10,
-       x2 + x11 - 20,
+#f = -3*x1 - 3*x2 + 2*x4 + 2*x5 - 60
+#g = [ 40-(x1 - 2*x2 + x4 + x5), 
+#      x4, 50-x4, x5, 50-x5, x6, 200-x6, x7, 200-x7, x8, 200-x8, x9, 200-x9, 
+#      x10, 200-x10, x11, 200-x11, x12, 200-x12, x13, 200-x13, x14, 200-x14, 
+#      x15, 200-x15, x16, 200-x16, x17, 200-x17 ]
+#h = [ 2*x1 - x4 + x6 + 10, 
+#      2*x2 - x5 + x7 + 10, 
+#      -x1 + x8 - 10, 
+#       x1 + x9 - 20, 
+#      -x2 + x10 - 10,
+#       x2 + x11 - 20,
+#       x6*x12,
+#       x7*x13,
+#       x8*x14,
+#       x9*x15,
+#       x10*x16,
+#       x11*x17,
+#       2*x1 - 2*x4 + 2*x12 - x14 + x15 + 40,
+#       2*x2 - 2*x5 + 2*x13 - x16 + x17 + 40]
+
+f = -3*x1 - 3*x2 + 1/2*x4 + 1/4*x5 - 3/10 
+g = [ 1/5 - (x1 - 2*x2 + 1/4*x4 + 1/4*x5), 
+      x4, 1-x4, x5, 1-x5, x6, 1-x6, x7, 1-x7, x8, 1-x8, x9, 1-x9, 
+      x10, 1-x10, x11, 1-x11, x12, 1-x12, x13, 1-x13, x14, 1-x14, 
+      x15, 1-x15, x16, 1-x16, x17, 1-x17 ]
+h = [ 2*x1 - 1/4*x4 + x6 + 1/20, 
+      2*x2 - 1/4*x5 + x7 + 1/20, 
+      -x1 + x8 - 1/20, 
+       x1 + x9 - 1/10, 
+      -x2 + x10 - 1/20,
+       x2 + x11 - 1/10,
        x6*x12,
        x7*x13,
        x8*x14,
        x9*x15,
        x10*x16,
        x11*x17,
-       2*x1 - 2*x4 + 2*x12 - x14 + x15 + 40,
-       2*x2 - 2*x5 + 2*x13 - x16 + x17 + 40]
-       
-    prob = momentprob(2, f, g, h)
-    X, Z, t, y, solsta = solve_mosek(prob);
+       2*x1 - 1/2*x4 + 2*x12 - x14 + x15 + 1/5,
+       2*x2 - 1/4*x5 + 2*x13 - x16 + x17 + 1/5]
+
+    f = f + 1e-5*dot(randn(16), variables(f.syms))
+    #prob = momentprob(2, f, g, h)
+    #X, Z, t, y, solsta = solve_mosek(prob);
+    
+    probc = momentprob_chordalembedding(3, f, g, h)
+    Xc, Zc, tc, yc, solstac = solve_mosek(probc);
+    
+    @test all( [ Polyopt.evalpoly(gi, yc[2:17]) for gi=g ] .> -1e-4 )
+    @test norm([ Polyopt.evalpoly(hi, yc[2:17]) for hi=h ], Inf) < 1e-4 
 end
 end
 
@@ -293,10 +337,8 @@ let
     @test all( [ Polyopt.evalpoly(gi, yc[2:9]) for gi=g ] .> -1e-4 )
 end
 
-end
-
 #http://gamsworld.org/global/globallib/ex5_4_2.htm
-#let 
+let 
     x1,x2,x3,x4,x5,x6,x7,x8 = variables(["x1","x2","x3","x4","x5","x6","x7","x8"])
 
     #f = x1 + x2 + x3 
@@ -339,20 +381,19 @@ end
     probc = momentprob_chordalembedding(3, f, g)
     Xc, Zc, tc, yc, solstac = solve_mosek(probc);
     @test all( [ Polyopt.evalpoly(gi, yc[2:9]) for gi=g ] .> -1e-4 )
-#end
+end
 
-if false
 let
     x1,x2,x3,x4 = variables(["x1","x2","x3","x4"])
 
     f = x1-x2+x3-x4 - (x1^3+x2^3+x3^3+x4^3) 
     g = [-1-x1*x2, 1-x1*x2,
-        -1-x2*x3, 1-x2*x3,
-        -1-x3*x4, 1-x3*x4,
-        1-x1^2,
-        1-x2^2,
-        1-x3^2,
-        1-x4^2 ]
+         -1-x2*x3, 1-x2*x3,
+         -1-x3*x4, 1-x3*x4,
+          1-x1^2,
+          1-x2^2,
+          1-x3^2,
+          1-x4^2 ]
 
     prob = momentprob(2, f, g)
     X, Z, t, y, solsta = solve_mosek(prob);
@@ -387,5 +428,4 @@ let
         g[10]*dot(v3, Xc[13]*v3)
     
     @test approxzero( f - t - r )
-end
 end

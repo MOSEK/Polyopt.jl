@@ -20,6 +20,11 @@ let
     X, Z, t, y, solsta = solve_mosek(prob)
 
     @test norm(y[1:8]-[1; 0; 1/3; 0; 1/3; 0; 1/3; 1]) < 1e-4
+    
+    probc = momentprob_chordalembedding(order, obj, [qual_bnd; cap_bnd; flow_bnd], [flow_eq; blend_eq])
+    Xc, Zc, tc, yc, solstac = solve_mosek(probc)
+
+    @test norm(yc[1:8]-[1; 0; 1/3; 0; 1/3; 0; 1/3; 1]) < 1e-4    
 end
 
 

@@ -41,7 +41,7 @@ function chordal_embedding{Tv<:Number,Ti<:Int}(A::SparseMatrixCSC{Tv,Ti}, Perm::
     m, n = size(A)
     S = CHOLMOD.Sparse(round(Float64,A))
     
-    F = cholfact(round(Float64,A), shift=n, perm=Perm)    
+    F = cholfact(round(Float64,A), shift=n, perm=Perm, postorder=true)    
     s = unsafe_load(F.p)
     p = round(Int64,[ unsafe_load(s.Perm, i) for i=1:s.n])
 
