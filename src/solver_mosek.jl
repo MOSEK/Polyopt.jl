@@ -54,6 +54,7 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
     appendcons(task, 1)
     putaij(task, 1, 1, 1.0)
     
+    I = Array(Int,0)
     for i=1:numcon
 
         added_const = ( i == 1);
@@ -87,6 +88,7 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
         end
         
         if added_const
+            push!(I, i)
             putconbound(task, numconst, MSK_BK_FX, prob.obj[i], prob.obj[i])
             numconst = numconst + 1
         end
@@ -114,6 +116,8 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
     Z = [ 0.5*(Zk + diagm(diag(Zk))) for Zk = Z ]
 
     y = gety(task, MSK_SOL_ITR)
+    if length(y) < length(prob.obj) y = sparsevec(I, y) end
+    
     if solsta == MSK_SOL_STA_OPTIMAL
         return (X, Z, t, y, "Optimal")
     elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
