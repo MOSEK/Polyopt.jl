@@ -52,38 +52,45 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
     # Add constraints
     numconst = 1
     appendcons(task, 1)
+    putaij(task, 1, 1, 1.0)
+    
     for i=1:numcon
-        ai_is_nonzero = false 
+
+        added_const = ( i == 1);
+        
         for j=1:numbarvar
             nj = Int64(barvardim[j])            
             k1, k2 = prob.mom[j].colptr[i], prob.mom[j].colptr[i+1]-1
             if k2 >= k1
+            
+                if !added_const
+                    appendcons(task, 1)
+                    added_const = true
+                end                
                 subk, subl = ind2sub( (nj, nj), prob.mom[j].rowval[k1:k2] )
                 aij = appendsparsesymmat(task, Int32(nj), round(Int32,subk), round(Int32,subl), map(Float64,prob.mom[j].nzval[k1:k2]))
                 putbaraij(task, Int32(numconst), Int32(j), [aij], [1.0])
-            
-                ai_is_nonzero = true
             end
         end
         
         for j=1:length(prob.eq)
             k1, k2 = prob.eq[j].colptr[i], prob.eq[j].colptr[i+1]-1
             if k2 >= k1
+                if !added_const
+                    appendcons(task, 1)
+                    added_const = true
+                end                
+                
                 subj = trilind( prob.eq[j].rowval[k1:k2], eqdim[j] ) + eqidx[j] + 1
                 putaijlist(task, numconst*ones(Int, length(subj)), subj, map(Float64,prob.eq[j].nzval[k1:k2]))
-            
-                ai_is_nonzero = true
             end
         end
         
-        if ai_is_nonzero
+        if added_const
             putconbound(task, numconst, MSK_BK_FX, prob.obj[i], prob.obj[i])
             numconst = numconst + 1
-            appendcons(task, 1)
         end
     end
-    
-    putaij(task, 1, 1, 1.0)
 
     # Input the objective sense (minimize/maximize)
     putobjsense(task,MSK_OBJECTIVE_SENSE_MAXIMIZE)
