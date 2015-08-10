@@ -168,7 +168,7 @@ function promote_poly{S,T}(p1::Poly{S}, p2::Poly{T})
     end
 end
 
-function evalpoly{T<:Number,S<:Number}(p::Poly{T}, x::Vector{S})
+function evalpoly{T<:Number,S<:Number}(p::Poly{T}, x::AbstractArray{S})
     val = zero(S)
     for j=1:p.m
         val += p.c[j]*prod(vec(x) .^ vec(p.alpha[j,:]))

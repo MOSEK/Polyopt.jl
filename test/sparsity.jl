@@ -191,9 +191,10 @@ if false
 
    # Here the CSP matrix is chordal, so Nie's method is identical to Waki's.
    #prob2 = Polyopt.momentprob_chordal(2, Array{Int,1}[ [1,2], [2,3] ], f)
-   #X2, Z2, t2, y2, solsta2 = solve_mosek(prob2)
+   #X2, Z2, t2,ngth y2, solsta2 = solve_mosek(prob2)
 
    perm = basis_reorder(f.deg, f)
+   perm = [1:length(perm);]
    #perm = [length(perm):-1:1;]
 
    A, cliques = chordal_sparsity_sos(f.deg, f, perm)
@@ -248,13 +249,13 @@ if false
     n = 10
     x = variables(ASCIIString[string("x",k) for k=1:n])
     h = [ 2*x[1]^2 - 3*x[1] + 2*x[2] - 1, [ 2*x[i]^2 + x[i-1] - 3*x[i] + 2*x[i+1] - 1 for i=2:n-1 ], 2*x[n]^2 + x[n-1] - 3*x[n] - 1 ]
-    f = sum([ hi^2 for hi=h ]) #+ 1e-4*dot(randn(n), x)
+    f = sum([ hi^2 for hi=h ]) + 1e-5*dot(randn(n), x)
 
     I =  Array{Int,1}[Array[[1, 2]]; [[i - 1, i, i + 1] for i = 2:n-1]; Array[n-1:n]]
     prob = Polyopt.momentprob_chordal(2, I, f);
     X, Z, t, y, solsta = solve_mosek(prob2);
 
-    #perm = basis_reorder(f.deg, f)
+    perm = basis_reorder(f.deg, f)
     #perm = [1:length(perm);]
     perm = [length(perm):-1:1;]
     A, cliques = chordal_sparsity_sos(f.deg, f, perm)
@@ -266,4 +267,25 @@ if false
     err1 = [ Polyopt.evalpoly(hi, y[2:n+1]) for hi = h ]
     err2 = [ Polyopt.evalpoly(hi, y2[2:n+1]) for hi = h ]
             
+end
+
+if true
+   x1, x2, x3 = variables(["x1", "x2", "x3"]);
+
+   f  = (x1-1)^4 + (x2-0.5)^4 + (x3-1/3)^4 + x1*x2*x3
+
+   prob = momentprob(f.deg >> 1, f)
+   X, Z, t, y, solsta = solve_mosek(prob)
+
+   # Here the CSP matrix is chordal, so Nie's method is identical to Waki's.
+   #prob2 = Polyopt.momentprob_chordal(2, Array{Int,1}[ [1,2], [2,3] ], f)
+   #X2, Z2, t2,ngth y2, solsta2 = solve_mosek(prob2)
+
+   perm = basis_reorder(f.deg, f)
+   #perm = [1:length(perm);]
+   #perm = [length(perm):-1:1;]
+
+   A, cliques = chordal_sparsity_sos(f.deg, f, perm)
+   prob3 = momentprob_chordal_new(f.deg >> 1, cliques, f, perm)
+   X3, Z3, t3, y3, solsta3 = solve_mosek(prob3)
 end

@@ -5,6 +5,8 @@ approxzero{T<:Number}(p::Polyopt.Poly{T}, threshold=1e-6) = (norm(p.c, Inf) < th
 
 # example of unconstrained global optimization
 let
+    println("Unconstrained global optimization")
+    
     x, z = variables(["x", "z"])
     f = 4*x^2 + x*z - 4*z^2 - 21//10*x^4 + 4*z^4 + 1//3*x^6
     
@@ -20,6 +22,8 @@ end
 
 # gloptipoly example
 let
+    println("Gloptipoly example")
+    
     x1, x2, x3 = variables(["x1", "x2", "x3"])
 
     # This is the Gloptipoly example.  
@@ -44,6 +48,8 @@ end
 
 # determine if f(x,z) is can be written as a SOS
 let
+    println("SOS example 1")
+
     x, z = variables(["x", "z"])
     f = 2*x^4 + 2*x^3*z - x^2*z^2 + 5*z^4
 
@@ -57,6 +63,8 @@ end
 
 # in this case f(x,z) is not SOS, but f(x,z)-t is SOS
 let
+    println("SOS example 2")
+    
     x, z = variables(["x", "z"])
 
     f = (x + z + 1)^2 - 1
@@ -73,6 +81,8 @@ end
 
 # test duality for problem with inequality constraints
 let
+    println("Duality example")
+
     x, z = variables(["x", "z"])
 
     f = x^4 + z^2 + 1
@@ -90,6 +100,8 @@ end
 
 # Test duality for problem with both inequality and equality constraints 
 let
+    println("SOS example 1")
+
     x1, x2 = variables(["x1", "x2"])
     f = x1 + x2  
     g = x1 - x2 
@@ -112,6 +124,8 @@ end
 
 # Example 6.23 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
 let
+    println("SOS example 2")
+    
     x1, x2 = variables(["x1", "x2"])
 
     f = -x1 - x2
@@ -129,6 +143,8 @@ end
 
 # Example 6.25 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
 let
+    println("Constrained optimization, Laurent 1")
+    
     x1, x2, x3 = variables(["x1", "x2", "x3"])
     
     f = x1^2*x2^2*(x1^2 + x2^2 - 3*x3^2) + x3^6 + 1e-2*(x1^6 + x2^6 + x3^6)
@@ -143,6 +159,8 @@ end
 
 # Example 6.26 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
 let
+    println("Constrained optimization, Laurent 2")
+    
     x1, x2, x3 = variables(["x1", "x2", "x3"])
     
     f = 1 + 1e-3*(x1+x2+x3)
@@ -177,6 +195,8 @@ end
     
 # http://gamsworld.org/global/globallib/ex2_1_1.htm
 let
+    println("Globallib ex2_1_1")
+    
     x1, x2, x3, x4, x5 = variables(["x1", "x2", "x3", "x4", "x5"])
 
     f =  -0.5*(100*x1^2 + 100*x2^2 + 100*x3^2 + 100*x4^2 + 100*x5^2) + 42*x1 + 44*x2 + 45*x3 + 47*x4 + 47.5*x5
@@ -189,6 +209,8 @@ end
 
 # http://gamsworld.org/global/globallib/ex2_1_2.htm
 let
+    println("Globallib ex2_1_2")
+    
     x1, x2, x3, x4, x5, x6 = variables(["x1", "x2", "x3", "x4", "x5", "x6"])
     
     f = -0.5*(x1*x1 + x2*x2 + x3*x3 + x4*x4 + x5*x5) - 10.5*x1 - 7.5*x2 - 3.5*x3 - 2.5*x4 - 1.5*x5 - 10*x6
@@ -201,6 +223,8 @@ end
 
 # http://gamsworld.org/global/globallib/ex2_1_4.htm
 let
+    println("Globallib ex2_1_4")
+
     x1, x2, x3, x4, x5, x6 = variables(["x1", "x2", "x3", "x4", "x5", "x6"])
     
     f = (6.5*x1 - 0.5*x1*x1) - x2 - 2*x3 - 3*x4 - 2*x5 - x6
@@ -218,6 +242,8 @@ end
   
 # http://gamsworld.org/global/globallib/ex3_1_2.htm
 let 
+    println("Globallib ex3_1_2")
+    
     x1, x2, x3, x4, x5 = variables(["x1", "x2", "x3", "x4", "x5"])
  
     f = -40792.141 + 0.8356891*x1*x5 + 37.293239*x1 + 5.3578547*x3*x3 
@@ -235,7 +261,9 @@ let
 end
 
 # http://gamsworld.org/global/globallib/ex3_1_1.htm
-let
+#let
+    println("Globallib ex3_1_1")
+
     x1, x2, x3, x4, x5, x6, x7, x8 = variables(["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"])
     #f = x1 + x2 + x3
     #g = [ 1 - (0.0025*x4 + 0.0025*x6),
@@ -277,10 +305,12 @@ let
     probc = momentprob_chordalembedding(3, f, g)
     Xc, Zc, tc, yc, solstac = solve_mosek(probc);
     @test all( [ Polyopt.evalpoly(gi, yc[2:9]) for gi=g ] .> -1e-4 )
-end
+#end
 
 #http://gamsworld.org/global/globallib/ex5_4_2.htm
 let 
+    println("Globallib ex5_4_2")
+    
     x1,x2,x3,x4,x5,x6,x7,x8 = variables(["x1","x2","x3","x4","x5","x6","x7","x8"])
 
     #f = x1 + x2 + x3 
@@ -326,6 +356,8 @@ let
 end
 
 let
+    println("Chordal relaxation")
+    
     x1,x2,x3,x4 = variables(["x1","x2","x3","x4"])
 
     f = x1-x2+x3-x4 - (x1^3+x2^3+x3^3+x4^3) 
