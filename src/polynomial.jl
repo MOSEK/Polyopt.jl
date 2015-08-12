@@ -28,6 +28,7 @@ end
 
 Poly{T<:Number}(syms::Symbols, alpha::Array{Int,2}, c::Array{T,1}) = Poly{T}(syms, alpha, c)
 Poly{T<:Number}(c::T) = Poly{T}(c)
+#Poly{T}(p::Poly{T}) = Poly(p.syms, copy(p.alpha), copy(p.c))
 
 convert{S,T}(::Type{Poly{S}}, p::Poly{T}) = Poly(p.syms, p.alpha, convert(Array{S}, p.c))
 
@@ -83,6 +84,7 @@ end
 
 function add(p1::Poly, p2::Poly) 
     p1, p2 = promote_poly(p1, p2)
+    #println("XXX: add($(p1),$(p2))=$(Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, p2.c)))")    
     Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, p2.c))
 end
 
@@ -91,14 +93,24 @@ function sub(p1::Poly, p2::Poly)
     Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, -p2.c))
 end
 
-+(p1::Poly, p2::Poly) = simplify( add(p1, p2) )
+#+(p1::Poly, p2::Poly) = simplify( add(p1, p2) )
+
+function +(p1::Poly, p2::Poly)
+    #println("XXX: simplify($(add(p1, p2))) = $(simplify( add(p1, p2) ))")
+    tmp=simplify( add(p1, p2) )
+    println("XXX: tmp=$(tmp), type=$(typeof(tmp.c))")
+    tmp    
+end
+
 -(p1::Poly, p2::Poly) = simplify( sub(p1, p2) )
 
 function *{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
     p1, p2 = promote_poly(p1, p2)
     if p2.m == 1
+        #println("$(p1)*$(p2)=$(Poly(p1.syms, p1.alpha .+ p2.alpha, p1.c*p2.c[1]))")
         Poly(p1.syms, p1.alpha .+ p2.alpha, p1.c*p2.c[1])
     elseif p1.m == 1
+        #println("$(p1)*$(p2)=$(Poly(p1.syms, p2.alpha .+ p1.alpha, p2.c*p1.c[1]))")
         Poly(p1.syms, p2.alpha .+ p1.alpha, p2.c*p1.c[1])
     else    
         if p1.m < p2.m
@@ -112,7 +124,11 @@ function *{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
                 r = add(r, Poly(p1.syms, p1.alpha .+ p2.alpha[k,:], p1.c*p2.c[k]))                
             end                    
         end
-        simplify(r)
+        #println("r=$(r)")
+        #r2 = simplify(r)
+        #println("r=$(r)")
+        #println("r2=$(r2)")
+        simplify(r)       
     end
 end
 
@@ -179,17 +195,24 @@ end
 # combine identical terms and remove zero terms
 function simplify{T<:Number}(p::Poly{T})
     lgt = 0
-    labeled = falses(p.m)
+    
+    c1 = p.c
+    c2 = copy(p.c)
+    println("XXX: c1 = $(c1), c2 = $(c2)")
+    println("XXX: typeof(c1)=$(typeof(c1)), typeof(c2)=$(typeof(c2))")
+    g = Poly(p.syms, copy(p.alpha), copy(p.c))
+    
+    labeled = falses(g.m)    
     # labeled monomial terms are either zero, or have been merged with other terms.
-    for k=1:p.m
+    for k=1:g.m
         if ~labeled[k]
-            for j=k+1:p.m
-                if (~labeled[j] && p.alpha[k,:] == p.alpha[j,:])
-                    p.c[k] += p.c[j]
+            for j=k+1:g.m
+                if (~labeled[j] && g.alpha[k,:] == g.alpha[j,:])
+                    g.c[k] += g.c[j]
                     labeled[j] = true
                 end
             end
-            if p.c[k] != zero(T)
+            if g.c[k] != zero(T)
                 lgt += 1
             else
                 labeled[k] = true
@@ -198,18 +221,19 @@ function simplify{T<:Number}(p::Poly{T})
     end
 
     # the unlabeled terms form the reduced polynomial
-    alpha = Array(Int, lgt, p.n)
+    alpha = Array(Int, lgt, g.n)
     c = Array(T, lgt)
     lgt = 1
-    for k=1:p.m
+    for k=1:g.m
         if ~labeled[k]
-            alpha[lgt,:] = p.alpha[k,:]
-            c[lgt] = p.c[k]
+            alpha[lgt,:] = g.alpha[k,:]
+            c[lgt] = g.c[k]
             lgt += 1
         end
     end
-    perm = sortperm([ vec(alpha[i,1:p.n]) for i=1:size(alpha,1)], lt=grilex_isless)
-    Poly(p.syms, alpha[perm,:], c[perm])
+    perm = sortperm([ vec(alpha[i,1:g.n]) for i=1:size(alpha,1)], lt=grilex_isless)
+    
+    Poly(g.syms, alpha[perm,:], c[perm])
 end
 
 function truncate{T<:Number}(p::Poly{T}, threshold=1e-10)

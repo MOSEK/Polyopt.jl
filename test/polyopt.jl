@@ -8,12 +8,14 @@ let
     println("Unconstrained global optimization")
     
     x, z = variables(["x", "z"])
-    f = 4*x^2 + x*z - 4*z^2 - 21//10*x^4 + 4*z^4 + 1//3*x^6
+    f = 4.0*x^2 + x*z #- 4*z^2 - 21//10*x^4 + 4*z^4 + 1//3*x^6
+
+    @assert(false)
     
     # perturb problem to find global optimizer
     f = f + 1e-3*(x+z)
-    
     prob = momentprob(3, f)
+    
     X, Z, t, y, solsta = solve_mosek(prob)
 
     # test that (x, z) = y[2:3] is globally optimal 

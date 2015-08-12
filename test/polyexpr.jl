@@ -20,10 +20,10 @@ let
     
     @test ( [x, y]*[x, y]' == [ x^2 x*y; x*y y^2] )
     @test ( [1 0; 0 2]*[x, y] == [x, 2*y])
-    @test ( dot([x,y], [x,y]) == x^2 + y^2 )
+    @test ( dot([x,y], [x,y]) == 1.0*x^2 + y^2 )
 end
 
-let
-    x, y, z = variables(["x", "y", "z"])
-    @test Polyopt.monomials(3,[x,y,z]) == [1,x,y,z,x^2,x*y,x*z,y^2,y*z,z^2,x^3,x^2*y,x^2*z,x*y^2,x*y*z,x*z^2,y^3,y^2*z,y*z^2,z^3]
-end
+#let
+#    x, y, z = variables(["x", "y", "z"])
+#    @test Polyopt.monomials(3,[x,y,z]) == [1,x,y,z,x^2,x*y,x*z,y^2,y*z,z^2,x^3,x^2*y,x^2*z,x*y^2,x*y*z,x*z^2,y^3,y^2*z,y*z^2,z^3]
+#end
