@@ -8,10 +8,11 @@ let
     println("Unconstrained global optimization")
     
     x, z = variables(["x", "z"])
-    f = 4.0*x^2 + x*z #- 4*z^2 - 21//10*x^4 + 4*z^4 + 1//3*x^6
+    f = 4.0*x^2 + x*z - 4*z^2 - 21//10*x^4 + 4*z^4 + 1//3*x^6
 
-    @assert(false)
-    
+    println(f.c)
+    @assert( f.c == [4.0, 1.0, -4.0, -2.1, 4.0, 1.0/3.0])
+
     # perturb problem to find global optimizer
     f = f + 1e-3*(x+z)
     prob = momentprob(3, f)

@@ -23,7 +23,7 @@ immutable Poly{T<:Number}
     end
 
     # we allow a constant polynomial without a proper symbol basis
-    Poly(c::T) = new(0, 1, Symbols([""]), [c], Array(Int, 1, 0), 0)
+    Poly(c::T) = new(0, 1, Symbols([""]), [c], Array(T, 1, 0), 0)
 end
 
 Poly{T<:Number}(syms::Symbols, alpha::Array{Int,2}, c::Array{T,1}) = Poly{T}(syms, alpha, c)
@@ -84,7 +84,6 @@ end
 
 function add(p1::Poly, p2::Poly) 
     p1, p2 = promote_poly(p1, p2)
-    #println("XXX: add($(p1),$(p2))=$(Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, p2.c)))")    
     Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, p2.c))
 end
 
@@ -93,24 +92,14 @@ function sub(p1::Poly, p2::Poly)
     Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, -p2.c))
 end
 
-#+(p1::Poly, p2::Poly) = simplify( add(p1, p2) )
-
-function +(p1::Poly, p2::Poly)
-    #println("XXX: simplify($(add(p1, p2))) = $(simplify( add(p1, p2) ))")
-    tmp=simplify( add(p1, p2) )
-    println("XXX: tmp=$(tmp), type=$(typeof(tmp.c))")
-    tmp    
-end
-
++(p1::Poly, p2::Poly) = simplify( add(p1, p2) )
 -(p1::Poly, p2::Poly) = simplify( sub(p1, p2) )
 
 function *{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
     p1, p2 = promote_poly(p1, p2)
     if p2.m == 1
-        #println("$(p1)*$(p2)=$(Poly(p1.syms, p1.alpha .+ p2.alpha, p1.c*p2.c[1]))")
         Poly(p1.syms, p1.alpha .+ p2.alpha, p1.c*p2.c[1])
     elseif p1.m == 1
-        #println("$(p1)*$(p2)=$(Poly(p1.syms, p2.alpha .+ p1.alpha, p2.c*p1.c[1]))")
         Poly(p1.syms, p2.alpha .+ p1.alpha, p2.c*p1.c[1])
     else    
         if p1.m < p2.m
@@ -124,10 +113,6 @@ function *{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
                 r = add(r, Poly(p1.syms, p1.alpha .+ p2.alpha[k,:], p1.c*p2.c[k]))                
             end                    
         end
-        #println("r=$(r)")
-        #r2 = simplify(r)
-        #println("r=$(r)")
-        #println("r2=$(r2)")
         simplify(r)       
     end
 end
@@ -195,13 +180,7 @@ end
 # combine identical terms and remove zero terms
 function simplify{T<:Number}(p::Poly{T})
     lgt = 0
-    
-    c1 = p.c
-    c2 = copy(p.c)
-    println("XXX: c1 = $(c1), c2 = $(c2)")
-    println("XXX: typeof(c1)=$(typeof(c1)), typeof(c2)=$(typeof(c2))")
-    g = Poly(p.syms, copy(p.alpha), copy(p.c))
-    
+    g = Poly(p.syms, copy(p.alpha), copy(p.c))    
     labeled = falses(g.m)    
     # labeled monomial terms are either zero, or have been merged with other terms.
     for k=1:g.m
