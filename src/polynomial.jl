@@ -28,7 +28,6 @@ end
 
 Poly{T<:Number}(syms::Symbols, alpha::Array{Int,2}, c::Array{T,1}) = Poly{T}(syms, alpha, c)
 Poly{T<:Number}(c::T) = Poly{T}(c)
-#Poly{T}(p::Poly{T}) = Poly(p.syms, copy(p.alpha), copy(p.c))
 
 convert{S,T}(::Type{Poly{S}}, p::Poly{T}) = Poly(p.syms, p.alpha, convert(Array{S}, p.c))
 
@@ -74,26 +73,29 @@ function show{T}(io::IO, p::Poly{T})
     end
 end
 
--(p::Poly) = Poly(p.syms, p.alpha, -p.c)
-+(p::Poly, a::Number) = p + Poly(a)
-+(a::Number, p::Poly) = Poly(a) + p
--(p::Poly, a::Number) = p - Poly(a)
--(a::Number, p::Poly) = Poly(a) - p
-*(p::Poly, a::Number) = Poly(p.syms, p.alpha, p.c*a)
-*(a::Number, p::Poly) = *(p::Poly, a::Number)
+-{T<:Number}(p::Poly{T}) = Poly{T}(p.syms, p.alpha, -p.c)
++{S<:Number,T<:Number}(p::Poly{S}, a::T) = p + Poly{T}(p.syms, zeros(Int64, 1, p.n), T[a])
++{S<:Number,T<:Number}(a::S, p::Poly{T}) = Poly{S}(p.syms, zeros(Int64, 1, p.n), S[a]) + p
+-{S<:Number,T<:Number}(p::Poly{T}, a::S) = p - Poly{S}(p.syms, zeros(Int64, 1, p.n), S[a])
+-{S<:Number,T<:Number}(a::S, p::Poly{T}) = Poly{S}(p.syms, zeros(Int64, 1, p.n), S[a]) - p
 
-function add(p1::Poly, p2::Poly) 
+*{S<:Number,T<:Number}(p::Poly{S}, a::T) = Poly{promote_type(S,T)}(p.syms, p.alpha, p.c*a)
+*{S<:Number,T<:Number}(a::S, p::Poly{T}) = *(p::Poly{T}, a::S)
+
+function add{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) 
+    U = Array{promote_type(S, T),1}
     p1, p2 = promote_poly(p1, p2)
-    Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, p2.c))
+    Poly{promote_type(S,T)}(p1.syms, vcat(p1.alpha, p2.alpha), vcat(convert(U,p1.c), convert(U,p2.c)))
 end
 
-function sub(p1::Poly, p2::Poly) 
+function sub{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) 
+    U = Array{promote_type(S, T),1}
     p1, p2 = promote_poly(p1, p2)
-    Poly(p1.syms, vcat(p1.alpha, p2.alpha), vcat(p1.c, -p2.c))
+    Poly{promote_type(S,T)}(p1.syms, vcat(p1.alpha, p2.alpha), vcat(convert(U,p1.c), -convert(U,p2.c)))
 end
 
-+(p1::Poly, p2::Poly) = simplify( add(p1, p2) )
--(p1::Poly, p2::Poly) = simplify( sub(p1, p2) )
++{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) = simplify( add(p1, p2) )
+-{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) = simplify( sub(p1, p2) )
 
 function *{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
     p1, p2 = promote_poly(p1, p2)
@@ -117,12 +119,12 @@ function *{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
     end
 end
 
-function ^{T}(p::Poly{T}, a::Int)
+function ^{T<:Number}(p::Poly{T}, a::Int)
     if a<0 error("power must be nonnegative") end
-    if a==0 return Poly(p.syms, zeros(Int, 1, p.n), [one(T)]) end
-    if p.n == 1 return Poly(p.syms, p.alpha*a, p.c.^a) end
+    if a==0 return Poly{T}(p.syms, zeros(Int, 1, p.n), [one(T)]) end
+    if p.n == 1 return Poly{T}(p.syms, p.alpha*a, p.c.^a) end
     
-    r = Poly(p)
+    r = Poly{T}(p)
     for k=2:a r *= p end
     r        
 end
@@ -134,13 +136,14 @@ typealias MatOrVec{T} Union(Array{T,1},Array{T,2})
 *{T<:Number,S<:Number}(a::Poly{T}, v::MatOrVec{Poly{S}}) = reshape(Poly{promote_type(T,S)}[ a*vi for vi=v ], size(v))
 *{T<:Number,S<:Number}(v::MatOrVec{Poly{S}}, a::Poly{T}) = reshape(Poly{promote_type(T,S)}[ a*vi for vi=v ], size(v))
 
-==(p1::Poly, p2::Poly) = (p1-p2).m == 0
+=={S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) = (p1-p2).m == 0
 
-conj(p::Poly) = Poly(p.syms, p.alpha, conj(p.c))
-convert{S<:Number}(::Type{Poly{S}}, a::S) = Poly{S}(convert(S,a))
-isconst(p::Poly) = p.m == 1 && p.n == 0
+conj{T<:Number}(p::Poly{T}) = Poly{T}(p.syms, p.alpha, conj(p.c))
+convert{T<:Number}(::Type{Poly{T}}, a::T) = Poly{S}(convert(T,a))
+isconst{T<:Number}(p::Poly{T}) = p.m == 1 && p.n == 0
 
-function A_mul_B!{S<:Number,T<:Number,}(alpha::Poly{S}, A::SparseMatrixCSC{S,Int}, x::Array{Poly{T},1}, beta::Poly{S}, y::Array{Poly{S},1})
+function A_mul_B!{S<:Number,T<:Number}(alpha::Poly{S}, A::SparseMatrixCSC{S,Int}, x::Array{Poly{T},1}, beta::Poly{S}, y::Array{Poly{S},1})
+
     for i=1:length(y)
         if beta == zero(y[i])
             y[i] = zero(y[i])
@@ -158,12 +161,12 @@ function A_mul_B!{S<:Number,T<:Number,}(alpha::Poly{S}, A::SparseMatrixCSC{S,Int
 end
 
 # promote polynomial to share the same Symbol basis
-function promote_poly{S,T}(p1::Poly{S}, p2::Poly{T})
+function promote_poly{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
     if (p1.syms == p2.syms) || (isconst(p1) && isconst(p2)) return (p1, p2) end
     if isconst(p1) && ~isconst(p2)
-        return (Poly(p2.syms, zeros(Int, 1, p2.n), p1.c), p2)
+        return (Poly{S}(p2.syms, zeros(Int, 1, p2.n), p1.c), p2)
     elseif ~isconst(p1) && isconst(p2)
-        return (p1, Poly(p1.syms, zeros(Int, 1, p1.n), p2.c))
+        return (p1, Poly{T}(p1.syms, zeros(Int, 1, p1.n), p2.c))
     else
         error("incompatible monomial bases")
     end
@@ -180,7 +183,7 @@ end
 # combine identical terms and remove zero terms
 function simplify{T<:Number}(p::Poly{T})
     lgt = 0
-    g = Poly(p.syms, copy(p.alpha), copy(p.c))    
+    g = Poly{T}(p.syms, copy(p.alpha), copy(p.c))    
     labeled = falses(g.m)    
     # labeled monomial terms are either zero, or have been merged with other terms.
     for k=1:g.m
@@ -212,7 +215,7 @@ function simplify{T<:Number}(p::Poly{T})
     end
     perm = sortperm([ vec(alpha[i,1:g.n]) for i=1:size(alpha,1)], lt=grilex_isless)
     
-    Poly(g.syms, alpha[perm,:], c[perm])
+    Poly{T}(g.syms, alpha[perm,:], c[perm])
 end
 
 function truncate{T<:Number}(p::Poly{T}, threshold=1e-10)
