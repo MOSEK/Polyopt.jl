@@ -28,8 +28,11 @@ end
 
 Poly{T<:Number}(syms::Symbols, alpha::Array{Int,2}, c::Array{T,1}) = Poly{T}(syms, alpha, c)
 Poly{T<:Number}(c::T) = Poly{T}(c)
+#Poly{T<:Number}(c::T) = Poly(c)
 
 convert{S,T}(::Type{Poly{S}}, p::Poly{T}) = Poly(p.syms, p.alpha, convert(Array{S}, p.c))
+convert{S,T}(::Type{Poly{S}}, c::T) = Poly{promote_type(S,T)}(p.syms, p.alpha, convert(promote_type(S,T), c))
+convert{S<:Number,T<:Number}(::Type{Polyopt.Poly{S}}, v::T) = convert(Polyopt.Poly{S},convert(S,v))
 
 zero{T<:Number}(::Type{Poly{T}}) = Poly(zero(T))
 zero{T<:Number}(::Poly{T}) = Poly(zero(T))
@@ -42,7 +45,7 @@ promote_rule(::Type{Rational}, ::Type{Int}) = Rational
 
 dot(a::Poly, b::Poly) = a*b
 dot(a::Number, b::Poly) = a*b
-dot(b::Number, a::Poly) = a*b
+dot(a::Poly, b::Number) = a*b
 
 function show{T}(io::IO, p::Poly{T})
     if p.m == 0 print(io, zero(T)) end
@@ -82,13 +85,13 @@ end
 *{S<:Number,T<:Number}(p::Poly{S}, a::T) = Poly{promote_type(S,T)}(p.syms, p.alpha, p.c*a)
 *{S<:Number,T<:Number}(a::S, p::Poly{T}) = *(p::Poly{T}, a::S)
 
-function add{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) 
+function add{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
     U = Array{promote_type(S, T),1}
     p1, p2 = promote_poly(p1, p2)
     Poly{promote_type(S,T)}(p1.syms, vcat(p1.alpha, p2.alpha), vcat(convert(U,p1.c), convert(U,p2.c)))
 end
 
-function sub{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) 
+function sub{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
     U = Array{promote_type(S, T),1}
     p1, p2 = promote_poly(p1, p2)
     Poly{promote_type(S,T)}(p1.syms, vcat(p1.alpha, p2.alpha), vcat(convert(U,p1.c), -convert(U,p2.c)))
@@ -103,19 +106,19 @@ function *{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
         Poly(p1.syms, p1.alpha .+ p2.alpha, p1.c*p2.c[1])
     elseif p1.m == 1
         Poly(p1.syms, p2.alpha .+ p1.alpha, p2.c*p1.c[1])
-    else    
+    else
         if p1.m < p2.m
             r = Poly(p1.syms, p2.alpha .+ p1.alpha[1,:], p2.c*p1.c[1])
             for k=2:p1.m
                 r = add(r, Poly(p1.syms, p2.alpha .+ p1.alpha[k,:], p2.c*p1.c[k]))
-            end            
+            end
         else
             r = Poly(p1.syms, p1.alpha .+ p2.alpha[1,:], p1.c*p2.c[1])
             for k=2:p2.m
-                r = add(r, Poly(p1.syms, p1.alpha .+ p2.alpha[k,:], p1.c*p2.c[k]))                
-            end                    
+                r = add(r, Poly(p1.syms, p1.alpha .+ p2.alpha[k,:], p1.c*p2.c[k]))
+            end
         end
-        simplify(r)       
+        simplify(r)
     end
 end
 
@@ -123,20 +126,20 @@ function ^{T<:Number}(p::Poly{T}, a::Int)
     if a<0 error("power must be nonnegative") end
     if a==0 return Poly{T}(p.syms, zeros(Int, 1, p.n), [one(T)]) end
     if p.n == 1 return Poly{T}(p.syms, p.alpha*a, p.c.^a) end
-    
+
     r = Poly{T}(p)
     for k=2:a r *= p end
-    r        
+    r
 end
 
-typealias MatOrVec{T} Union(Array{T,1},Array{T,2})
+typealias MatOrVec{T} Union{Array{T,1},Array{T,2}}
 
 *{T<:Number,S<:Number}(a::T, v::MatOrVec{Poly{S}}) = reshape(Poly{promote_type(T,S)}[ a*vi for vi=v ], size(v))
 *{T<:Number,S<:Number}(v::MatOrVec{Poly{T}}, a::S) = reshape(Poly{promote_type(T,S)}[ a*vi for vi=v ], size(v))
 *{T<:Number,S<:Number}(a::Poly{T}, v::MatOrVec{Poly{S}}) = reshape(Poly{promote_type(T,S)}[ a*vi for vi=v ], size(v))
 *{T<:Number,S<:Number}(v::MatOrVec{Poly{S}}, a::Poly{T}) = reshape(Poly{promote_type(T,S)}[ a*vi for vi=v ], size(v))
 
-=={S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) = (p1-p2).m == 0
+=={S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) = (p1-p2).n == 0
 
 conj{T<:Number}(p::Poly{T}) = Poly{T}(p.syms, p.alpha, conj(p.c))
 convert{T<:Number}(::Type{Poly{T}}, a::T) = Poly{T}(convert(T,a))
@@ -182,9 +185,10 @@ end
 
 # combine identical terms and remove zero terms
 function simplify{T<:Number}(p::Poly{T})
+
     lgt = 0
-    g = Poly{T}(p.syms, copy(p.alpha), copy(p.c))    
-    labeled = falses(g.m)    
+    g = Poly{T}(p.syms, copy(p.alpha), copy(p.c))
+    labeled = falses(g.m)
     # labeled monomial terms are either zero, or have been merged with other terms.
     for k=1:g.m
         if ~labeled[k]
@@ -202,6 +206,10 @@ function simplify{T<:Number}(p::Poly{T})
         end
     end
 
+    if lgt == 0
+        return zero(Poly{T})
+    end
+
     # the unlabeled terms form the reduced polynomial
     alpha = Array(Int, lgt, g.n)
     c = Array(T, lgt)
@@ -214,7 +222,7 @@ function simplify{T<:Number}(p::Poly{T})
         end
     end
     perm = sortperm([ vec(alpha[i,1:g.n]) for i=1:size(alpha,1)], lt=grilex_isless)
-    
+
     Poly{T}(g.syms, alpha[perm,:], c[perm])
 end
 
