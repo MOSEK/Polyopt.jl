@@ -1,6 +1,8 @@
 module Polyopt
 
-export MomentProb, momentprob, momentprob_chordalembedding, solve_mosek, monomials
+export solve_mosek, monomials
+export MomentProb, momentprob, momentprob_chordal, momentprob_chordalembedding 
+export BSOSProb, bsosprob_chordal
 
 import Base.^
 
@@ -13,6 +15,16 @@ immutable MomentProb{T<:Number}
     obj   :: AbstractArray{T}
     mom   :: Array{Any,1}
     eq    :: Array{Any,1}
+end
+
+immutable BSOSProb{T<:Number}
+    degree :: Int
+    order  :: Int
+    basis :: Vector{Poly{Int}}   
+    obj    :: AbstractArray{T}
+    Al     :: Array{Any,1}
+    El     :: Array{Any,1}
+    As     :: Array{Any,1}
 end
 
 include("solver_mosek.jl")
@@ -189,8 +201,8 @@ momentprob{S,T}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},1}) =
     momentprob(order, obj, pineq, Poly{Int}[])
 
 function momentprob_chordal{S,T,U}(order::Int, cliques::Array{Array{Int,1},1}, obj::Poly{S},
-                                       pineq::Array{Poly{T},1}, pineq_index::Array{Int,1},
-                                       peq::Array{Poly{U},1}, peq_index::Array{Int,1})
+                                   pineq::Array{Poly{T},1}, pineq_index::Array{Int,1},
+                                   peq::Array{Poly{U},1}, peq_index::Array{Int,1})
 
     v = monomials(2*order, variables(obj.syms))
     imap = indexmap(v)
@@ -255,5 +267,59 @@ momentprob_chordalembedding{S,T}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},
 momentprob_chordalembedding{S}(order::Int, obj::Poly{S}) =
     momentprob_chordalembedding(order, obj, Poly{Int}[], Poly{Int}[])
 
+function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int,1}}, 
+                               obj::Poly{S}, pineq::Array{Poly{T},1})
+
+    J = Vector{Int}[]
+    for j=1:length(cliques)
+        push!(J, [])
+    end
+
+    for (i, gi) in enumerate(pineq)
+        j = clique_index(cliques, find(sum(gi.alpha,1)))
+        push!(J[j], i)
+    end
+
+    dmax = max(obj.deg, 2*order, degree*maximum([gi.deg for gi in pineq]))
+
+    x = variables(obj.syms)
+    basis = monomials(dmax, x)
+    imap = indexmap(basis)
+    f = vectorize(obj, imap)
+
+    As = []
+    Al = []
+    El = []
+    for (j,c) in enumerate(cliques)
+        u = monomials(order, x[c])
+        M = u*u'
+
+        v = monomials(2*order, x[c])   
+        push!(As, vectorize(M, indexmap(v)))
+    
+        v = monomials(dmax, x[c])
+        imapc = indexmap(v)
+
+        mc = length(J[j])
+        # generate the (a,b) powers upto degree max |a| + |b| <= d  
+        ab_d = monomials(degree, variables(ASCIIString[ "z$(i)" for i=1:2*mc ]))    
+        p = vcat([ pineq[i] for i=J[j] ], [ 1-pineq[i] for i=J[j] ])
+        ai, aj, av = Int[], Int[], Float64[]
+        for (i, ab) in enumerate(ab_d)
+            h_ab = prod(p .^ vec(ab.alpha))
+            #println("h_$(vec(ab.alpha)): ", h_ab)
+            ak = vectorize(h_ab, imapc)
+
+            push!(ai, i*ones(ak.rowval)...)
+            push!(aj, ak.rowval...)
+            push!(av, ak.nzval...)                
+        end
+        push!(Al, sparse(ai, aj, av, length(ab_d), length(imapc)))  
+        push!(El, vectorize(v, imap))    
+    end
+       
+    BSOSProb(degree, order, basis, f, Al, El, As)
 end
 
+
+end
