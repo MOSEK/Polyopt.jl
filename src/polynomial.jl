@@ -140,6 +140,8 @@ typealias MatOrVec{T} Union{Array{T,1},Array{T,2}}
 *{T<:Number,S<:Number}(v::MatOrVec{Poly{S}}, a::Poly{T}) = reshape(Poly{promote_type(T,S)}[ a*vi for vi=v ], size(v))
 
 =={S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) = (p1-p2).n == 0
+=={S<:Number,T<:Number}(p::Poly{S}, c::T) = p == Poly(c) 
+=={S<:Number,T<:Number}(c::S, p::Poly{T}) = p == Poly(c) 
 
 conj{T<:Number}(p::Poly{T}) = Poly{T}(p.syms, p.alpha, conj(p.c))
 convert{T<:Number}(::Type{Poly{T}}, a::T) = Poly{T}(convert(T,a))

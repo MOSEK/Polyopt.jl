@@ -69,8 +69,9 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
                     added_const = true
                 end                
                 subk, subl = ind2sub( (nj, nj), prob.mom[j].rowval[k1:k2] )
-                aij = appendsparsesymmat(task, Int32(nj), round(Int32,subk), round(Int32,subl), map(Float64,prob.mom[j].nzval[k1:k2]))
-                putbaraij(task, Int32(numconst), Int32(j), [aij], [1.0])
+		        trilidx = subk .>= subl            
+                aij = appendsparsesymmat(task, nj, subk[trilidx], subl[trilidx], prob.mom[j].nzval[k1:k2][trilidx])
+                putbaraij(task, numconst, j, [aij], [1.0])
             end
         end
         
@@ -83,7 +84,7 @@ function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
                 end                
                 
                 subj = trilind( prob.eq[j].rowval[k1:k2], eqdim[j] ) + eqidx[j] + 1
-                putaijlist(task, numconst*ones(Int, length(subj)), subj, map(Float64,prob.eq[j].nzval[k1:k2]))
+                putaijlist(task, numconst*ones(Int, length(subj)), subj, prob.eq[j].nzval[k1:k2])
             end
         end
         

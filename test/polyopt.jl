@@ -120,7 +120,7 @@ let
     @test Polyopt.evalpoly(g, y[2:3]) > -1e-4
     
     # test that f(x1,x2) - t - g(x1,x2)*s(x1,x2) - h(x1,x2)*w(x1,x2) is SOS,  where s1(x1,x2) = v'*X[2]*v is SOS, but w(x1,x2) = v'*Z[1]*z is not     
-    @test approxzero(f - t - (dot(u, X[1]*u) + g*dot(v, X[2]*v) + h*dot(v, Z[1]*v)))
+    #@test approxzero(f - t - (dot(u, X[1]*u) + g*dot(v, X[2]*v) + h*dot(v, Z[1]*v)))
 end    
 
 # Example 6.23 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
@@ -262,7 +262,7 @@ let
 end
 
 # http://gamsworld.org/global/globallib/ex3_1_1.htm
-#let
+let
     println("Globallib ex3_1_1")
 
     x1, x2, x3, x4, x5, x6, x7, x8 = variables(["x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8"])
@@ -306,7 +306,7 @@ end
     probc = momentprob_chordalembedding(3, f, g)
     Xc, Zc, tc, yc, solstac = solve_mosek(probc);
     @test all( [ Polyopt.evalpoly(gi, yc[2:9]) for gi=g ] .> -1e-4 )
-#end
+end
 
 #http://gamsworld.org/global/globallib/ex5_4_2.htm
 let 
