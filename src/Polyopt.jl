@@ -17,7 +17,6 @@ end
 
 include("solver_mosek.jl")
 include("latex.jl")
-include("sedumi.jl")
 
 function _merge_monomials{T<:Number}(a::Array{Poly{T},1}, b::Array{Poly{T},1})
 
