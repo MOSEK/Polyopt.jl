@@ -17,7 +17,7 @@ using Mosek
 #
 function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
 
-    printstream(msg::String) = print(msg)
+    printstream(msg::AbstractString) = print(msg)
 
     # Create a task object and attach log stream printer
     task = maketask()
@@ -147,7 +147,7 @@ trilind(k::Vector{Int}, n::Int) = Int[i + (j-1)*(n-1) - (j-1)*(j-2)>>1 for (i,j)
 #      lj >= 0,   Xj >= 0
 function solve_mosek(prob::BSOSProb, tolrelgap=1e-10; showlog=true)
     
-    printstream(msg::String) = print(msg)
+    printstream(msg::AbstractString) = print(msg)
 
     # Create a task object and attach log stream printer
     task = maketask()
