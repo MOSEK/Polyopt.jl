@@ -2,8 +2,8 @@ import Base: show, *, -, +, isless, ==, convert, conj, truncate, zero, one, prom
 
 export variables
 
-immutable Symbols
-    names :: Array{ASCIIString,1}
+immutable Symbols{T<:AbstractString}
+    names :: Array{T,1}
 end
 
 immutable Poly{T<:Number}
@@ -270,4 +270,5 @@ function grilex_isless(a::Array{Int}, b::Array{Int})
 end
 
 variables(syms::Symbols) = [Poly{Int}(syms, [zeros(Int,1,k-1) 1 zeros(Int,1,length(syms.names)-k)], [1]) for k=1:length(syms.names)]
-variables(syms::Vector{ASCIIString}) = variables(Symbols(syms))
+variables{T<:AbstractString}(syms::Vector{T}) = variables(Symbols(syms))
+variables{T<:AbstractString}(sym::T, n::Int) = variables([string(sym,i) for i=1:n])
