@@ -15,7 +15,7 @@ using Mosek
 #              Xj is PSD, j=1,...,length(prob.mom)
 #              Zk is symmetric but free,  k=1,...,length(prob.eq)   
 #
-function solve_mosek(prob::MomentProb, tolrelgap=1e-10; showlog=true)
+function solve_mosek(prob::MomentProb; tolrelgap=1e-10, showlog=true)
 
     printstream(msg::AbstractString) = print(msg)
 
@@ -145,7 +145,7 @@ trilind(k::Vector{Int}, n::Int) = Int[i + (j-1)*(n-1) - (j-1)*(j-2)>>1 for (i,j)
 # st.  fj - Al[j]'*lj + As[j]'*Xj = 0,  j=1,...,size(Al,1)
 #      sum Ej * fj = f - t*e1
 #      lj >= 0,   Xj >= 0
-function solve_mosek(prob::BSOSProb, tolrelgap=1e-10; showlog=true)
+function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     
     printstream(msg::AbstractString) = print(msg)
 
