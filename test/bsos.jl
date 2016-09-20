@@ -1,3 +1,6 @@
+using Polyopt
+using Base.Test
+
 # Simple convex quadratic problem with two variables in different cliques
 let
     x = variables(["x1", "x2"])
@@ -7,11 +10,7 @@ let
     I = Array{Int,1}[ [1], [2] ]
     prob = bsosprob_chordal(1, 1, I, f, g)
     X, t, l, b, y = solve_mosek(prob)
-    
-    @test abs(t - Polyopt.evalpoly(f, y[2:3])) < 1e-4
-    @test all( [ Polyopt.evalpoly(gi, y[2:3]) for gi=g ] .> -1e-4 ) 
 end
-
 
 # P4_2 from Weisser's paper
 let
@@ -27,8 +26,6 @@ let
     I = Array{Int,1}[ [1,2,3,4] ]
     prob = bsosprob_chordal(1, 1, I, f, g)
     X, t, l, b, y = solve_mosek(prob)
-    @test abs(t - Polyopt.evalpoly(f, y[2:5])) < 1e-4
-    @test all( [ Polyopt.evalpoly(gi, y[2:5]) for gi=g ] .> -1e-4 ) 
 end             
 
 # P4_4 from Weisser's paper (we cannot reproduce bounds)
@@ -74,12 +71,10 @@ let
           x[1]^2 + x[2]^3 + x[3]^2 + x[4]^4,
           x[1], x[2], x[3], x[4] ]
 
-
     I = Array{Int,1}[ [1,2,3,4] ]
     prob = bsosprob_chordal(3, 4, I, f, g)
     X, t, l, b, y = solve_mosek(prob)
 end
-
 
 # Haverly1 from Marandi's paper 
 let
@@ -98,4 +93,22 @@ let
 
     prob = bsosprob_chordal(3, 2, I, f, g)
     X, t, l, b, y = solve_mosek(prob)
+end
+
+# Generalized Rosenbrock function
+let
+    n = 100
+    x = variables("x", n)
+
+    I = Array{Int,1}[]
+    for i=1:n-1
+        push!(I, [i, i+1])
+    end
+
+    f = sum([ 100*(x[i]-x[i-1]^2)^2 + (1-x[i])^2 for i=2:n ])
+    g = vcat(Polyopt.Poly{Int}[x[i] for i=1:n], Polyopt.Poly{Int}[2 - sum(x[Ik].^2) for Ik in I])
+
+    prob = bsosprob_chordal(3, 2, I, f, g);
+    X, t, l, b, y = solve_mosek(prob);
+    t
 end

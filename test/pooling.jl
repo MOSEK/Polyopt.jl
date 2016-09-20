@@ -18,13 +18,15 @@ let
     prob = momentprob(order, obj, [qual_bnd; cap_bnd; flow_bnd], [flow_eq; blend_eq])
 
     X, Z, t, y, solsta = solve_mosek(prob)
+    xo = Polyopt.vectorize([x14,x24,x35,x36,x45,x46,w4],2*order)*y
 
-    @test norm(y[1:8]-[1; 0; 1/3; 0; 1/3; 0; 1/3; 1]) < 1e-4
+    @test norm(xo-[0; 1/3; 0; 1/3; 0; 1/3; 1]) < 1e-4
     
     probc = momentprob_chordalembedding(order, obj, [qual_bnd; cap_bnd; flow_bnd], [flow_eq; blend_eq])
     Xc, Zc, tc, yc, solstac = solve_mosek(probc)
+    xo = Polyopt.vectorize([x14,x24,x35,x36,x45,x46,w4],2*order)*yc
 
-    @test norm(yc[1:8]-[1; 0; 1/3; 0; 1/3; 0; 1/3; 1]) < 1e-4    
+    @test norm(xo-[0; 1/3; 0; 1/3; 0; 1/3; 1]) < 1e-4    
 end
 
 

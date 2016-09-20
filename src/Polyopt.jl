@@ -2,9 +2,9 @@ module Polyopt
 
 export solve_mosek, monomials
 export MomentProb, momentprob, momentprob_chordal, momentprob_chordalembedding 
-export BSOSProb, bsosprob_chordal
+export BSOSProb, bsosprob_chordal, bsosprob_chordal2
 
-import Base.^
+import Base.^, Base.start, Base.next, Base.done, Base.sub, Base.length
 
 include("polynomial.jl")
 include("cliques.jl")
@@ -20,7 +20,6 @@ end
 immutable BSOSProb{T<:Number}
     degree :: Int
     order  :: Int
-    basis :: Vector{Poly{Int}}   
     obj    :: AbstractArray{T}
     Al     :: Array{Any,1}
     El     :: Array{Any,1}
@@ -29,6 +28,35 @@ end
 
 include("solver_mosek.jl")
 include("latex.jl")
+
+
+immutable MonomialPowers
+    n :: Int
+    d :: Int
+end
+
+monomialpowers(n, d) = MonomialPowers(n, d)
+start(m::MonomialPowers) = zeros(Int, m.n)
+done(m::MonomialPowers, powers::Vector{Int}) = (powers[1] == m.d)
+length(m::MonomialPowers) = binomial(m.n + m.d, m.d)
+
+function next(m::MonomialPowers, powers::Vector{Int})
+
+    # find index of element to increment
+    k = m.n
+    while (k>1)
+        if sum(sub(powers,1:k)) < m.d
+            break
+        end
+        k -= 1
+    end     
+
+    state = copy(powers)    
+    state[k+1:end] = 0                        
+    state[k] += 1
+    
+    powers, state
+end
 
 function _merge_monomials{T<:Number}(a::Array{Poly{T},1}, b::Array{Poly{T},1})
 
@@ -80,6 +108,41 @@ function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
     monoms
 end
 
+# function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
+# 
+#     # find index of element to increment
+#     function findindex(a::Array{Int,2}, deg::Int)
+#         k=length(a)    
+#         while (k>1)
+#             if sum(a[1:k]) < deg
+#                 break
+#             end
+#             k -= 1
+#         end     
+#         k
+#     end
+#     
+#     n = length(vars)
+#     m = binomial(n+deg,deg)
+#     
+#     a = zeros(Int, 1, n)    
+#     r = Array(Poly{T}, m)            
+#     
+#     for i=1:m
+#         r[i] = Poly{T}( vars[1].syms, copy(a), [1] )
+#     
+#         k = findindex(a, deg)
+#         a[k+1:end] = 0                        
+#         a[k] += 1
+#     end
+#     r
+# end
+
+# function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
+#     [ Poly{T}(vars[1].syms, a', [1]) for a in monomialpowers(vars[1].n, deg) ]    
+# end
+
+
 function moment(order::Int, syms::Symbols)
     v = monomials(order, variables(syms))
     v*v'
@@ -100,32 +163,61 @@ function moment{T<:Number}(order::Int, syms::Symbols, p::Poly{T}, I::Array{Int})
     p*v*v'
 end
 
-function indexmap{T<:Number}(v::Array{Poly{T},1})
-    Dict( [(v[k].alpha, k) for k=1:length(v)] )
-end
+# function indexmap{T<:Number}(v::Array{Poly{T},1})
+#     Dict( [(v[k].alpha, k) for k=1:length(v)] )
+# end
+# 
+# linear_index(imap::Dict{Array{Int,2},Int}, p::Poly) = Int[ imap[p.alpha[i,:]] for i=1:p.m ]
+# 
+# vectorize{T<:Number}(p::Polyopt.Poly{T}, imap::Dict{Array{Int,2},Int}) = sparsevec(linear_index(imap,p), p.c, length(imap))
+# 
+# function vectorize{T<:Number}(A::AbstractArray{Poly{T}}, imap::Dict{Array{Int,2},Int})
+#     dims = length(size(A))
+#     if dims==1
+#         m, n = length(A), 1
+#     elseif dims==2
+#         m, n = size(A)
+#     else
+#         error("dimension must be <= 2")
+#     end
+#     subi = Int[]
+#     subj = Int[]
+#     val  = T[]
+#     for j=1:n
+#         for i=1:m
+#             I = linear_index(imap,A[i,j])
+#             v = A[i,j].c
+#             push!(subi, (i+(j-1)*m)*ones(Int, length(v))...)
+#             push!(subj, I...)
+#             push!(val, v...)
+#         end
+#     end
+#     sparse(subi, subj, val, m*n, length(imap))
+# end
 
-linear_index(imap::Dict{Array{Int,2},Int}, p::Poly) = Int[ imap[p.alpha[i,:]] for i=1:p.m ]
-
-function vectorize{T<:Number}(p::Polyopt.Poly{T}, imap::Dict{Array{Int,2},Int})
-    sparsevec(linear_index(imap,p), p.c, length(imap))
-end
-
-function inverse_indexmap{T<:Number}(v::Array{Poly{T},1}, imap::Dict{Array{Int,2},Int})
-
-    lu = binomial(v[end].n + round(Int,v[end].deg/2), v[end].n)
-    u  = v[1:lu]
-    y = Array(Array{Tuple{Int64,Int64},1},length(v))
-    for j=1:length(y) y[j] = [] end
-
-    for j=1:lu
-        for i=j:lu
-            push!(y[ imap[(u[i]*u[j]).alpha] ], (i,j) )
+function basis_index(a::Vector{Int}, degree::Int)
+    n = length(a)
+    idx = 1        
+    for j=1:n-1                
+        if a[j] > 0 
+            dj = degree - sum(a[1:j-1])            
+            for i=0:a[j]-1            
+                nj = n-j
+                di = dj - i
+                idx += binomial(nj+di, di)
+            end
         end
     end
-    y
+    idx + a[n]
 end
 
-function vectorize{T<:Number}(A::AbstractArray{Poly{T}}, imap::Dict{Array{Int,2},Int})
+basis_index(p::Poly, degree::Int) = basis_index(vec(p.alpha), degree)
+
+linear_index(p::Poly, d::Int) = Int[ basis_index(vec(p.alpha[i,:]), d) for i=1:p.m ]
+
+vectorize{T<:Number}(p::Polyopt.Poly{T}, d::Int) = sparsevec(linear_index(p, d), p.c, binomial(p.n+d,d))
+
+function vectorize{T<:Number}(A::AbstractArray{Poly{T}}, d::Int)
     dims = length(size(A))
     if dims==1
         m, n = length(A), 1
@@ -139,56 +231,39 @@ function vectorize{T<:Number}(A::AbstractArray{Poly{T}}, imap::Dict{Array{Int,2}
     val  = T[]
     for j=1:n
         for i=1:m
-            I = linear_index(imap,A[i,j])
+            I = linear_index(A[i,j], d)
             v = A[i,j].c
             push!(subi, (i+(j-1)*m)*ones(Int, length(v))...)
             push!(subj, I...)
             push!(val, v...)
         end
     end
-    sparse(subi, subj, val, m*n, length(imap))
-end
-
-function vectorize{T<:Number}(A::Symmetric{Poly{T}}, imap::Dict{Array{Int,2},Int})
-    m, n = size(A)
-    subi = Int[]
-    subj = Int[]
-    val  = T[]
-    for j=1:m
-        v = A[j,j].c
-        push!(subi, (j+(j-1)*m)*ones(Int, length(v))...)
-        push!(subj, linear_index(imap,M[j,j])...)
-        push!(val, v...)
-        for i=j+1:m
-            I = linear_index(imap,M[i,j])
-            v = A[i,j].c
-            push!(subi, (i+(j-1)*m)*ones(Int, length(v))...)
-            push!(subj, I...)
-            push!(val, v...)
-        end
-    end
-    sparse(subi, subj, val, m*m, length(imap))
+    sparse(subi, subj, val, m*n, binomial(A[1].n+d,d))
 end
 
 function momentprob{S,T,U}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},1}, peq::Array{Poly{U},1})
 
     v = monomials(2*order, variables(obj.syms))
-    imap = indexmap(v)
+    #imap = indexmap(v)
 
     obj.deg <= 2*order || error("obj has degree higher than 2*order")
 
-    p = vectorize(obj, imap)
+    #p = vectorize(obj, imap)
+    p = vectorize(obj, 2*order)
     mom = Array(Any, length(pineq)+1)
-    mom[1] = vectorize(moment(order, obj.syms), imap)
+    #mom[1] = vectorize(moment(order, obj.syms), imap)
+    mom[1] = vectorize(moment(order, obj.syms), 2*order)
     for k=1:length(pineq)
        pineq[k].deg <= 2*order || error("pineq[$(k)] has degree higher than 2*order")
-       mom[k+1] = vectorize(moment(order, pineq[k].syms, pineq[k]), imap)
+       #mom[k+1] = vectorize(moment(order, pineq[k].syms, pineq[k]), imap)
+       mom[k+1] = vectorize(moment(order, pineq[k].syms, pineq[k]), 2*order)
     end
 
     momeq = Array(Any, length(peq))
     for k=1:length(peq)
         peq[k].deg <= 2*order || error("peq[$(k)] has degree higher than 2*order")
-        momeq[k] = vectorize(moment(order, peq[k].syms, peq[k]), imap)
+        #momeq[k] = vectorize(moment(order, peq[k].syms, peq[k]), imap)
+        momeq[k] = vectorize(moment(order, peq[k].syms, peq[k]), 2*order)
     end
 
     MomentProb(order, v, p, mom, momeq)
@@ -205,25 +280,30 @@ function momentprob_chordal{S,T,U}(order::Int, cliques::Array{Array{Int,1},1}, o
                                    peq::Array{Poly{U},1}, peq_index::Array{Int,1})
 
     v = monomials(2*order, variables(obj.syms))
-    imap = indexmap(v)
+    #imap = indexmap(v)
 
     obj.deg <= 2*order || error("obj has degree higher than 2*order")
-
-    p = vectorize(obj, imap)
+    
+    #p = vectorize(obj, imap)
+    p = vectorize(obj, 2*order)
     mom = Array(Any, length(pineq) + length(cliques))
     for k=1:length(cliques)
-        mom[k] = vectorize(moment(order, obj.syms, cliques[k]), imap)
+        #mom[k] = vectorize(moment(order, obj.syms, cliques[k]), imap)
+        mom[k] = vectorize(moment(order, obj.syms, cliques[k]), 2*order)
     end
 
+    
     for k=1:length(pineq)
         pineq[k].deg <= 2*order || error("pineq[$(k)] has degree higher than 2*order")
-        mom[length(cliques)+k] = vectorize(moment(order, pineq[k].syms, pineq[k], cliques[pineq_index[k]]), imap)
+        #mom[length(cliques)+k] = vectorize(moment(order, pineq[k].syms, pineq[k], cliques[pineq_index[k]]), imap)
+        mom[length(cliques)+k] = vectorize(moment(order, pineq[k].syms, pineq[k], cliques[pineq_index[k]]), 2*order)
     end
 
     momeq = Array(Any, length(peq))
     for k=1:length(peq)
         peq[k].deg <= 2*order || error("peq[$(k)] has degree higher than 2*order")
-        momeq[k] = vectorize(moment(order, peq[k].syms, peq[k], cliques[peq_index[k]]), imap)
+        #momeq[k] = vectorize(moment(order, peq[k].syms, peq[k], cliques[peq_index[k]]), imap)
+        momeq[k] = vectorize(moment(order, peq[k].syms, peq[k], cliques[peq_index[k]]), 2*order)
     end
 
     MomentProb(order, v,  p, mom, momeq)
@@ -267,8 +347,81 @@ momentprob_chordalembedding{S,T}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},
 momentprob_chordalembedding{S}(order::Int, obj::Poly{S}) =
     momentprob_chordalembedding(order, obj, Poly{Int}[], Poly{Int}[])
 
+# function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int,1}}, 
+#                                obj::Poly{S}, pineq::Array{Poly{T},1})
+# 
+#     J = Vector{Int}[]
+#     for j=1:length(cliques)
+#         push!(J, [])
+#     end
+# 
+#     for (i, gi) in enumerate(pineq)
+#         j = clique_index(cliques, find(sum(gi.alpha,1)))
+#         push!(J[j], i)
+#     end
+# 
+#     dmax = max(obj.deg, 2*order, degree*maximum([gi.deg for gi in pineq]))
+# 
+#     x = variables(obj.syms)
+#     basis = monomials(dmax, x)
+#     imap = indexmap(basis)
+#     f = vectorize(obj, imap)
+# 
+#     As = []
+#     Al = []
+#     El = []
+#     for (j,c) in enumerate(cliques)
+#         u = monomials(order, x[c])
+#         M = u*u'
+# 
+#         v = monomials(2*order, x[c])   
+#         push!(As, vectorize(M, indexmap(v)))
+#     
+#         v = monomials(dmax, x[c])
+#         imapc = indexmap(v)
+# 
+#         mc = length(J[j])
+#         # generate the (a,b) powers upto degree max |a| + |b| <= d  
+#         ab_d = monomials(degree, variables(ASCIIString[ "z$(i)" for i=1:2*mc ]))    
+#         p = vcat([ pineq[i] for i=J[j] ], [ 1-pineq[i] for i=J[j] ])
+#         ai, aj, av = Int[], Int[], Float64[]
+#         for (i, ab) in enumerate(ab_d)
+#             h_ab = prod(p .^ vec(ab.alpha))
+#             #println("h_$(vec(ab.alpha)): ", h_ab)
+#             ak = vectorize(h_ab, imapc)
+# 
+#             push!(ai, i*ones(ak.rowval)...)
+#             push!(aj, ak.rowval...)
+#             push!(av, ak.nzval...)                
+#         end
+#         push!(Al, sparse(ai, aj, av, length(ab_d), length(imapc)))  
+#         push!(El, vectorize(v, imap))    
+#     end
+#        
+#     BSOSProb(degree, order, f, Al, El, As)
+# end
+
+function symbol_restrict{T<:Number}(p::Poly{T}, syms::Symbols, I::Array{Int,1})
+
+    if p.n == 0
+        p
+    else
+        mask = ones(Int, p.n)
+        mask[I] = 0    
+        J = find(p.alpha * mask .== 0)
+        Poly{T}(syms, p.alpha[J,I], p.c[J])
+    end
+end
+
 function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int,1}}, 
                                obj::Poly{S}, pineq::Array{Poly{T},1})
+
+    n = obj.n
+    dmax = max(obj.deg, 2*order, degree*maximum([gi.deg for gi in pineq]))
+    m = binomial(n+dmax,dmax)
+
+    x = variables(obj.syms)
+    f = vectorize(obj, dmax)
 
     J = Vector{Int}[]
     for j=1:length(cliques)
@@ -279,47 +432,47 @@ function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int
         j = clique_index(cliques, find(sum(gi.alpha,1)))
         push!(J[j], i)
     end
-
-    dmax = max(obj.deg, 2*order, degree*maximum([gi.deg for gi in pineq]))
-
-    x = variables(obj.syms)
-    basis = monomials(dmax, x)
-    imap = indexmap(basis)
-    f = vectorize(obj, imap)
-
-    As = []
-    Al = []
-    El = []
-    for (j,c) in enumerate(cliques)
-        u = monomials(order, x[c])
-        M = u*u'
-
-        v = monomials(2*order, x[c])   
-        push!(As, vectorize(M, indexmap(v)))
     
-        v = monomials(dmax, x[c])
-        imapc = indexmap(v)
+    println("cliques: ", cliques)
+    println("J: ", J)
+    
+    As, Al, El = [], [], []
+    for (j,c) in enumerate(cliques)
+        println("c:",c)
+        symc = Symbols(obj.syms.names[c])
+        xc = Poly{Int}[symbol_restrict(x[i], symc, c) for i in c ]
+        println("xc=",xc)
+        
+        u = monomials(order, xc)
+        M = u*u'  
+        push!(As, vectorize(M, dmax))
 
         mc = length(J[j])
-        # generate the (a,b) powers upto degree max |a| + |b| <= d  
-        ab_d = monomials(degree, variables(ASCIIString[ "z$(i)" for i=1:2*mc ]))    
-        p = vcat([ pineq[i] for i=J[j] ], [ 1-pineq[i] for i=J[j] ])
+        
+        # generate the (a,b) powers upto degree max |a| + |b| <= d
+        println("mc=$(mc), degree=$(degree)")  
+        ab_d = monomialpowers(2*mc, degree)            
+        pj = [ symbol_restrict(pineq[i], symc, c) for i=J[j] ]
+        
+        p = vcat( pj, [ (1-pji) for pji in pj ])
         ai, aj, av = Int[], Int[], Float64[]
         for (i, ab) in enumerate(ab_d)
-            h_ab = prod(p .^ vec(ab.alpha))
-            #println("h_$(vec(ab.alpha)): ", h_ab)
-            ak = vectorize(h_ab, imapc)
+            h_ab = prod(p .^ ab)
+            ak = vectorize(h_ab, dmax)
 
             push!(ai, i*ones(ak.rowval)...)
             push!(aj, ak.rowval...)
             push!(av, ak.nzval...)                
         end
-        push!(Al, sparse(ai, aj, av, length(ab_d), length(imapc)))  
-        push!(El, vectorize(v, imap))    
+        push!(Al, sparse(ai, aj, av, length(ab_d), binomial(length(c)+dmax,dmax)))  
+                
+        v = monomials(dmax, x[c])    
+        k = Int[ basis_index(vi, dmax) for vi=v ]
+        push!(El, SparseMatrixCSC{Int,Int}(m,length(k),collect(1:length(k)+1),k,ones(Int,length(k))))
+                       
     end
-       
-    BSOSProb(degree, order, basis, f, Al, El, As)
+    
+    BSOSProb(degree, order, f, Al, El, As)
 end
-
 
 end

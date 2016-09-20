@@ -9,7 +9,6 @@ let
     
     x, z = variables(["x", "z"])
     f = 4.0*x^2 + x*z - 4*z^2 - 21//10*x^4 + 4*z^4 + 1//3*x^6
-    @assert( f.c == [4.0, 1.0, -4.0, -2.1, 4.0, 1.0/3.0])
 
     # perturb problem to find global optimizer
     f = f + 1e-3*(x+z)
@@ -17,8 +16,9 @@ let
     
     X, Z, t, y, solsta = solve_mosek(prob)
 
-    # test that (x, z) = y[2:3] is globally optimal 
-    @test abs(t - Polyopt.evalpoly(f, y[2:3])) < 1e-6
+    # test that (x, z) = (y[8], y[2]) is globally optimal 
+    xo = Polyopt.vectorize([x,z],6)*y
+    @test abs(t - Polyopt.evalpoly(f, xo)) < 1e-6
 end
 
 # gloptipoly example
@@ -42,9 +42,10 @@ let
     prob = momentprob(4, f, g)
     X, Z, t, y, solsta = solve_mosek(prob)
         
-    # test that (x1, x2, x3) = y[2:4] is globally optimal 
-    @test abs(t - Polyopt.evalpoly(f, y[2:4])) < 1e-6
-    @test all( [ Polyopt.evalpoly(gi, y[2:4]) for gi=g ] .> -1e-4 )
+    # test that (x1, x2, x3) extracted from y is globally optimal
+    xo = Polyopt.vectorize([x1,x2,x3], 8)*y
+    @test abs(t - Polyopt.evalpoly(f, xo)) < 1e-6
+    @test all( [ Polyopt.evalpoly(gi, xo)  for gi=g ] .> -1e-4 )
 end
 
 # determine if f(x,z) is can be written as a SOS
@@ -115,9 +116,10 @@ let
     v = monomials(1, [x1,x2])
     
     # test optimality
-    @test abs(t - Polyopt.evalpoly(f, y[2:3])) < 1e-4
-    @test abs(Polyopt.evalpoly(h, y[2:3])) < 1e-4
-    @test Polyopt.evalpoly(g, y[2:3]) > -1e-4
+    xo = Polyopt.vectorize([x1,x2], 4)*y
+    @test abs(t - Polyopt.evalpoly(f, xo)) < 1e-4
+    @test abs(Polyopt.evalpoly(h, xo)) < 1e-4
+    @test Polyopt.evalpoly(g, xo) > -1e-4
     
     # test that f(x1,x2) - t - g(x1,x2)*s(x1,x2) - h(x1,x2)*w(x1,x2) is SOS,  where s1(x1,x2) = v'*X[2]*v is SOS, but w(x1,x2) = v'*Z[1]*z is not     
     #@test approxzero(f - t - (dot(u, X[1]*u) + g*dot(v, X[2]*v) + h*dot(v, Z[1]*v)))
@@ -138,8 +140,9 @@ let
     prob = momentprob(4, f, g)
 
     X, Z, t, y, solsta = solve_mosek(prob)
-    @test abs(t - Polyopt.evalpoly(f, y[2:3])) < 1e-6
-    @test all( [ Polyopt.evalpoly(gi, y[2:3]) for gi=g ] .> -1e-4 )
+    xo = Polyopt.vectorize([x1,x2], 8)*y
+    @test abs(t - Polyopt.evalpoly(f, xo)) < 1e-6
+    @test all( [ Polyopt.evalpoly(gi, xo) for gi=g ] .> -1e-4 )
 end
 
 # Example 6.25 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
@@ -154,8 +157,9 @@ let
     prob = momentprob(4, f, [g])
 
     X, Z, t, y, solsta = solve_mosek(prob)
-    @test abs(t - Polyopt.evalpoly(f, y[2:4])) < 1e-6
-    @test Polyopt.evalpoly(g, y[2:4]) > -1e-4 
+    xo = Polyopt.vectorize([x1,x2,x3], 8)*y
+    @test abs(t - Polyopt.evalpoly(f, xo)) < 1e-6
+    @test Polyopt.evalpoly(g, xo) > -1e-4 
 end
 
 # Example 6.26 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
@@ -172,8 +176,9 @@ let
     prob1 = momentprob(6, f, Polyopt.Poly{Int}[], h)
 
     X, Z, t, y, solsta = solve_mosek(prob1)
-    @test abs(t - Polyopt.evalpoly(f, y[2:4])) < 1e-4
-    @test norm([ Polyopt.evalpoly(hi, y[2:4]) for hi=h ], Inf) < 1e-4 
+    xo = Polyopt.vectorize([x1,x2,x3],12)*y
+    @test abs(t - Polyopt.evalpoly(f, xo)) < 1e-4
+    @test norm([ Polyopt.evalpoly(hi, xo) for hi=h ], Inf) < 1e-4 
 end
 
 # Example 8.8 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
@@ -184,7 +189,7 @@ let
     f = g1+g2;
     g = [g1, g2, 1-x1^2, 1-x2^2, 1-x3^2];
 
-    prob = momentprob(2, f, g);
+    prob = momentprob(3, f, g);
     X, Z, t, y, solsta = solve_mosek(prob);
 
     probc = momentprob_chordalembedding(3, f, g);
@@ -192,7 +197,6 @@ let
     
     @test abs(t-tc) < 1e-6
 end    
-    
     
 # http://gamsworld.org/global/globallib/ex2_1_1.htm
 let
@@ -204,8 +208,9 @@ let
     g = [40 - (20*x1 + 12*x2 + 11*x3 + 7*x4 + 4*x5), x1, 1-x1, x2, 1-x2, x3, 1-x3, x4, 1-x4, x5, 1-x5]
     
     prob = momentprob(3, f, g)
-    X, Z, t, y, solsta = solve_mosek(prob);    
-    @test all( [ Polyopt.evalpoly(gi, y[2:6]) for gi=g ] .> -1e-4 )
+    X, Z, t, y, solsta = solve_mosek(prob);
+    xo = Polyopt.vectorize([x1,x2,x3,x4,x5],6)*y    
+    @test all( [ Polyopt.evalpoly(gi, xo) for gi=g ] .> -1e-4 )
 end
 
 # http://gamsworld.org/global/globallib/ex2_1_2.htm
@@ -219,7 +224,8 @@ let
     
     prob = momentprob(2, f, g)
     X, Z, t, y, solsta = solve_mosek(prob);
-    @test all( [ Polyopt.evalpoly(gi, y[2:7]) for gi=g ] .> -1e-4 )
+    xo = Polyopt.vectorize([x1,x2,x3,x4,x5,x6],4)*y
+    @test all( [ Polyopt.evalpoly(gi, xo) for gi=g ] .> -1e-4 )
 end
 
 # http://gamsworld.org/global/globallib/ex2_1_4.htm
@@ -238,7 +244,8 @@ let
            
     prob = momentprob(2, f, g)
     X, Z, t, y, solsta = solve_mosek(prob);
-    @test all( [ Polyopt.evalpoly(gi, y[2:7]) for gi=g ] .> -1e-4 )
+    xo = Polyopt.vectorize([x1,x2,x3,x4,x5,x6],4)*y
+    @test all( [ Polyopt.evalpoly(gi, xo) for gi=g ] .> -1e-4 )
 end
   
 # http://gamsworld.org/global/globallib/ex3_1_2.htm
@@ -258,7 +265,8 @@ let
 
     prob = momentprob(2, f, g)
     X, Z, t, y, solsta = solve_mosek(prob);
-    @test all( [ Polyopt.evalpoly(gi, y[2:6]) for gi=g ] .> -1e-4 )
+    xo = Polyopt.vectorize([x1,x2,x3,x4,x5],4)*y
+    @test all( [ Polyopt.evalpoly(gi, xo) for gi=g ] .> -1e-4 )
 end
 
 # http://gamsworld.org/global/globallib/ex3_1_1.htm
@@ -299,13 +307,10 @@ let
           x7-0.01, 1-x7,                                    
           x8-0.01, 1-x8 ]                                    
 
-    #prob = momentprob(3, f, g)
-    #X, Z, t, y, solsta = solve_mosek(prob);
-    #@test all( [ Polyopt.evalpoly(gi, y[2:9]) for gi=g ] .> -1e-4 )
-    
     probc = momentprob_chordalembedding(3, f, g)
     Xc, Zc, tc, yc, solstac = solve_mosek(probc);
-    @test all( [ Polyopt.evalpoly(gi, yc[2:9]) for gi=g ] .> -1e-4 )
+    xo = Polyopt.vectorize([x1,x2,x3,x4,x5,x6,x7,x8],6)*yc
+    @test all( [ Polyopt.evalpoly(gi, xo) for gi=g ] .> -1e-4 )
 end
 
 #http://gamsworld.org/global/globallib/ex5_4_2.htm
@@ -347,13 +352,10 @@ let
           x7-10/1000, 1-x7, 
           x8-10/1000, 1-x8 ]
 
-    #prob = momentprob(3, f, g)
-    #X, Z, t, y, solsta = solve_mosek(prob);
-    #@test all( [ Polyopt.evalpoly(gi, y[2:9]) for gi=g ] .> -1e-4 )
-    
     probc = momentprob_chordalembedding(3, f, g)
     Xc, Zc, tc, yc, solstac = solve_mosek(probc);
-    @test all( [ Polyopt.evalpoly(gi, yc[2:9]) for gi=g ] .> -1e-4 )
+    xo = Polyopt.vectorize([x1,x2,x3,x4,x5,x6,x7,x8],6)*yc
+    @test all( [ Polyopt.evalpoly(gi, xo) for gi=g ] .> -1e-4 )
 end
 
 let
@@ -372,16 +374,18 @@ let
 
     prob = momentprob(2, f, g)
     X, Z, t, y, solsta = solve_mosek(prob);
-    @test all( [ Polyopt.evalpoly(gi, y[2:5]) for gi=g ] .> -1e-4 )
+    xo = Polyopt.vectorize([x1,x2,x3,x4],4)*y
+    @test all( [ Polyopt.evalpoly(gi, xo) for gi=g ] .> -1e-4 )
      
     K = Array{Int,1}[ [1,2], [2,3], [3,4] ]
     
-    probc = Polyopt.momentprob_chordal(2, K, 
-                                       f,
-                                       g, [ 1, 1, 2, 2, 3, 3, 1, 2, 3, 3 ])
+    probc = momentprob_chordal(2, K, 
+                               f,
+                               g, [ 1, 1, 2, 2, 3, 3, 1, 2, 3, 3 ])
 
     Xc, Zc, tc, yc, solstac = solve_mosek(probc);
-    @test all( [ Polyopt.evalpoly(gi, yc[2:5]) for gi=g ] .> -1e-4 )
+    xo = Polyopt.vectorize([x1,x2,x3,x4],4)*yc
+    @test all( [ Polyopt.evalpoly(gi, xo) for gi=g ] .> -1e-4 )
     
     u1 = monomials(2, [x1,x2,x3,x4][K[1]])
     u2 = monomials(2, [x1,x2,x3,x4][K[2]])

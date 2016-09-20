@@ -125,7 +125,7 @@ end
 function ^{T<:Number}(p::Poly{T}, a::Int)
     if a<0 error("power must be nonnegative") end
     if a==0 return Poly{T}(p.syms, zeros(Int, 1, p.n), [one(T)]) end
-    if p.n == 1 return Poly{T}(p.syms, p.alpha*a, p.c.^a) end
+    if p.m == 1 return Poly{T}(p.syms, p.alpha*a, p.c.^a) end
 
     r = Poly{T}(p)
     for k=2:a r *= p end
@@ -223,7 +223,7 @@ function simplify{T<:Number}(p::Poly{T})
             lgt += 1
         end
     end
-    perm = sortperm([ vec(alpha[i,1:g.n]) for i=1:size(alpha,1)], lt=grilex_isless)
+    perm = sortperm([ vec(alpha[i,1:g.n]) for i=1:size(alpha,1)], lt=lexless)
 
     Poly{T}(g.syms, alpha[perm,:], c[perm])
 end
@@ -250,24 +250,26 @@ function truncate{T<:Number}(p::Poly{T}, threshold=1e-10)
             lgt += 1
         end
     end
-    perm = sortperm([ vec(alpha[i,1:p.n]) for i=1:size(alpha,1)], lt=grilex_isless)
+    perm = sortperm([ vec(alpha[i,1:p.n]) for i=1:size(alpha,1)], lt=lexless)
     Poly(p.syms, alpha[perm,:], c[perm])
 end
 
 # ordering for polynomials
 function isless{T<:Number}(p1::Poly{T}, p2::Poly{T})
-    # sort polynomials by degree
-    if max(p1.m, p2.m) > 1 return p1.deg < p2.deg end
-
-    # otherwise use graded inverse lex-order for monomials
-    grilex_isless(p1.alpha, p2.alpha)
+#     # sort polynomials by degree
+#     if max(p1.m, p2.m) > 1 return p1.deg < p2.deg end
+# 
+#     # otherwise use graded inverse lex-order for monomials
+#     grilex_isless(p1.alpha, p2.alpha)
+    lexless(p1.alpha, p2.alpha)
 end
+
 
 # graded inverse lexicographic order (lowest total order first, then reverse lex)
-function grilex_isless(a::Array{Int}, b::Array{Int})
-    i, j = sum(a), sum(b)
-    i == j ? ~lexless(a, b) : i < j
-end
+# function grilex_isless(a::Array{Int}, b::Array{Int})
+#     i, j = sum(a), sum(b)
+#     i == j ? ~lexless(a, b) : i < j
+# end
 
 variables(syms::Symbols) = [Poly{Int}(syms, [zeros(Int,1,k-1) 1 zeros(Int,1,length(syms.names)-k)], [1]) for k=1:length(syms.names)]
 variables{T<:AbstractString}(syms::Vector{T}) = variables(Symbols(syms))
