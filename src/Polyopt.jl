@@ -433,15 +433,10 @@ function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int
         push!(J[j], i)
     end
     
-    println("cliques: ", cliques)
-    println("J: ", J)
-    
     As, Al, El = [], [], []
     for (j,c) in enumerate(cliques)
-        println("c:",c)
         symc = Symbols(obj.syms.names[c])
         xc = Poly{Int}[symbol_restrict(x[i], symc, c) for i in c ]
-        println("xc=",xc)
         
         u = monomials(order, xc)
         M = u*u'  
@@ -450,7 +445,6 @@ function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int
         mc = length(J[j])
         
         # generate the (a,b) powers upto degree max |a| + |b| <= d
-        println("mc=$(mc), degree=$(degree)")  
         ab_d = monomialpowers(2*mc, degree)            
         pj = [ symbol_restrict(pineq[i], symc, c) for i=J[j] ]
         
