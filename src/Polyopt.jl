@@ -37,7 +37,7 @@ end
 
 monomialpowers(n, d) = MonomialPowers(n, d)
 start(m::MonomialPowers) = zeros(Int, m.n)
-done(m::MonomialPowers, powers::Vector{Int}) = (powers[1] == m.d)
+done(m::MonomialPowers, state::Vector{Int}) = (state[1] == m.d+1)
 length(m::MonomialPowers) = binomial(m.n + m.d, m.d)
 
 function next(m::MonomialPowers, powers::Vector{Int})
@@ -137,7 +137,7 @@ end
 #     end
 #     r
 # end
-
+# 
 # function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
 #     [ Poly{T}(vars[1].syms, a', [1]) for a in monomialpowers(vars[1].n, deg) ]    
 # end
@@ -430,9 +430,11 @@ function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int
 
     for (i, gi) in enumerate(pineq)
         j = clique_index(cliques, find(sum(gi.alpha,1)))
+        #println("g($(i)): $(gi) belongs to cliques($(j)): cliques[$(j)]")
         push!(J[j], i)
     end
     
+    println("J: ", J)
     As, Al, El = [], [], []
     for (j,c) in enumerate(cliques)
         symc = Symbols(obj.syms.names[c])
@@ -445,6 +447,7 @@ function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int
         mc = length(J[j])
         
         # generate the (a,b) powers upto degree max |a| + |b| <= d
+        println("mc=$(mc)")
         ab_d = monomialpowers(2*mc, degree)            
         pj = [ symbol_restrict(pineq[i], symc, c) for i=J[j] ]
         
