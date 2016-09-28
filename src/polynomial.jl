@@ -1,4 +1,4 @@
-import Base: show, *, -, +, isless, ==, convert, conj, truncate, zero, one, promote_rule, A_mul_B!, dot
+import Base: show, *, -, +, isless, ==, convert, conj, truncate, zero, one, promote_rule, A_mul_B!, dot, transpose
 
 export variables
 
@@ -108,14 +108,14 @@ function *{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
         Poly(p1.syms, p2.alpha .+ p1.alpha, p2.c*p1.c[1])
     else
         if p1.m < p2.m
-            r = Poly(p1.syms, p2.alpha .+ p1.alpha[1,:], p2.c*p1.c[1])
+            r = Poly(p1.syms, p2.alpha .+ p1.alpha[1:1,:], p2.c*p1.c[1])
             for k=2:p1.m
-                r = add(r, Poly(p1.syms, p2.alpha .+ p1.alpha[k,:], p2.c*p1.c[k]))
+                r = add(r, Poly(p1.syms, p2.alpha .+ p1.alpha[k:k,:], p2.c*p1.c[k]))
             end
         else
-            r = Poly(p1.syms, p1.alpha .+ p2.alpha[1,:], p1.c*p2.c[1])
+            r = Poly(p1.syms, p1.alpha .+ p2.alpha[1:1,:], p1.c*p2.c[1])
             for k=2:p2.m
-                r = add(r, Poly(p1.syms, p1.alpha .+ p2.alpha[k,:], p1.c*p2.c[k]))
+                r = add(r, Poly(p1.syms, p1.alpha .+ p2.alpha[k:k,:], p1.c*p2.c[k]))
             end
         end
         simplify(r)
@@ -164,6 +164,8 @@ function A_mul_B!{S<:Number,T<:Number}(alpha::Poly{S}, A::SparseMatrixCSC{S,Int}
     end
     y
 end
+
+transpose{T<:Number}(p::Poly{T}) = p
 
 # promote polynomial to share the same Symbol basis
 function promote_poly{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})

@@ -35,7 +35,7 @@ function latex(p::Poly)
 end
 
 # convert a polynomial to vectorized tex format, e.g.,  2 y_{110} + y_{001}
-function latex(p::Poly, imap::Dict{Array{Int,2},Int}, texsymbols::Array{ASCIIString,1})
+function latex(p::Poly, imap::Dict{Array{Int,2},Int}, texsymbols::Array{String,1})
     if p.m == 0 return("0") end
 
     s = ""
@@ -57,7 +57,7 @@ function latex(p::Poly, imap::Dict{Array{Int,2},Int}, texsymbols::Array{ASCIIStr
     s
 end
 
-function latex{T}(M::Array{Poly{T}}, imap::Dict{Array{Int,2},Int}, texsymbols::Array{ASCIIString,1}, matrixlimit = 10)
+function latex{T}(M::Array{Poly{T}}, imap::Dict{Array{Int,2},Int}, texsymbols::Array{String,1}, matrixlimit = 10)
     n = size(M,1)
     s = "\\left[\n\\begin{array}{*{$(min(matrixlimit,n))}c}\n"
     if matrixlimit < n
@@ -77,7 +77,7 @@ function latex{T}(M::Array{Poly{T}}, imap::Dict{Array{Int,2},Int}, texsymbols::A
     string(s, "\\end{array}\n\\right]\n")
 end
 
-function latex_dual(prob::MomentProb, imap::Dict{Array{Int,2},Int}, texsymbols::Array{ASCIIString,1}, matrixlimit = 10)
+function latex_dual(prob::MomentProb, imap::Dict{Array{Int,2},Int}, texsymbols::Array{String,1}, matrixlimit = 10)
 
     s = string("Dual problem:\n\\[\n\\begin{array}{ll}\n\\text{minimize} &",
                latex(dot(prob.obj, prob.basis), imap, texsymbols), "\\\\\n")
@@ -113,7 +113,7 @@ end
 function latex_dual(prob::MomentProb, vectorizednames::Bool, matrixlimit::Int)
 
     imap = Polyopt.indexmap(prob.basis)
-    syms = Array(ASCIIString, length(imap))
+    syms = Array(String, length(imap))
 
     if vectorizednames == true
         for (key,k) = imap
@@ -177,7 +177,7 @@ function latex_footer()
     string(s, "\\end{document}")
 end
 
-function latex(texfile::ASCIIString, prob::MomentProb, header="", body="", vectorizednames=false, matrixlimit=10)
+function latex(texfile::String, prob::MomentProb, header="", body="", vectorizednames=false, matrixlimit=10)
 
     f = open(texfile,"w")
 

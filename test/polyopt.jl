@@ -83,7 +83,7 @@ end
 
 # test duality for problem with inequality constraints
 let
-    println("Duality example")
+    println("Duality example 1")
 
     x, z = variables(["x", "z"])
 
@@ -102,7 +102,7 @@ end
 
 # Test duality for problem with both inequality and equality constraints 
 let
-    println("SOS example 1")
+    println("Duality example 2")
 
     x1, x2 = variables(["x1", "x2"])
     f = x1 + x2  
@@ -127,7 +127,7 @@ end
 
 # Example 6.23 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
 let
-    println("SOS example 2")
+    println("Duality example 3")
     
     x1, x2 = variables(["x1", "x2"])
 
@@ -183,6 +183,8 @@ end
 
 # Example 8.8 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
 let
+    println("Constrained optimization, Laurent 3")
+    
     x1, x2, x3 = variables(["x1", "x2", "x3"]);
 
     g1, g2 = x1^4 + (x1*x2-1)^2, x2^2*x3^2 + (x3^2-1)^2;

@@ -106,7 +106,7 @@ let
     end
 
     f = sum([ 100*(x[i]-x[i-1]^2)^2 + (1-x[i])^2 for i=2:n ])
-    g = vcat(Polyopt.Poly{Int}[x[i] for i=1:n], Polyopt.Poly{Int}[2 - sum(x[Ik].^2) for Ik in I])
+    g = vcat(Polyopt.Poly{Int}[x[i] for i=1:n], Polyopt.Poly{Int}[2 - sum([xk^2 for xk=x[Ik]]) for Ik in I])
 
     prob = bsosprob_chordal(3, 2, I, f, g);
     X, t, l, b, y = solve_mosek(prob);

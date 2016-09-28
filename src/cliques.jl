@@ -1,4 +1,4 @@
-using Base.SparseMatrix.CHOLMOD
+using Base.SparseArrays.CHOLMOD
 
 function chm_analyze_ordering{Tv<:CHOLMOD.VTypes}(A::CHOLMOD.Sparse{Tv}, ordering::Cint, Perm::Vector{Int})
     s = unsafe_load(A.p)
@@ -11,7 +11,7 @@ function chm_analyze_ordering{Tv<:CHOLMOD.VTypes}(A::CHOLMOD.Sparse{Tv}, orderin
     ccall((@CHOLMOD.cholmod_name("analyze_ordering",Int),:libcholmod), Cint,
           (Ptr{CHOLMOD.C_Sparse{Tv}}, Cint, Ptr{Int}, Ptr{Int}, Csize_t,
            Ptr{Int}, Ptr{Int}, Ptr{Int},
-           Ptr{Int}, Ptr{Int}, Ptr{Uint8}),
+           Ptr{Int}, Ptr{Int}, Ptr{UInt8}),
            A.p, ordering, Perm, C_NULL, zero(Csize_t), Parent, Post, ColCount, First, Level, CHOLMOD.common())
     Parent, Post, ColCount
 end
@@ -41,7 +41,7 @@ function chordal_embedding{Tv<:Number,Ti<:Int}(A::SparseMatrixCSC{Tv,Ti}, Perm::
     m, n = size(A)
     S = CHOLMOD.Sparse(round(Float64,A))
     
-    F = cholfact(round(Float64,A), shift=n, perm=Perm, postorder=true)    
+    F = cholfact(round(Float64,A), shift=n, perm=Perm)    
     s = unsafe_load(F.p)
     p = round(Int64,[ unsafe_load(s.Perm, i) for i=1:s.n])
 

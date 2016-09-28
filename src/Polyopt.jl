@@ -45,7 +45,7 @@ function next(m::MonomialPowers, powers::Vector{Int})
     # find index of element to increment
     k = m.n
     while (k>1)
-        if sum(sub(powers,1:k)) < m.d
+        if sum(view(powers,1:k)) < m.d
             break
         end
         k -= 1
@@ -347,60 +347,6 @@ momentprob_chordalembedding{S,T}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},
 momentprob_chordalembedding{S}(order::Int, obj::Poly{S}) =
     momentprob_chordalembedding(order, obj, Poly{Int}[], Poly{Int}[])
 
-# function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int,1}}, 
-#                                obj::Poly{S}, pineq::Array{Poly{T},1})
-# 
-#     J = Vector{Int}[]
-#     for j=1:length(cliques)
-#         push!(J, [])
-#     end
-# 
-#     for (i, gi) in enumerate(pineq)
-#         j = clique_index(cliques, find(sum(gi.alpha,1)))
-#         push!(J[j], i)
-#     end
-# 
-#     dmax = max(obj.deg, 2*order, degree*maximum([gi.deg for gi in pineq]))
-# 
-#     x = variables(obj.syms)
-#     basis = monomials(dmax, x)
-#     imap = indexmap(basis)
-#     f = vectorize(obj, imap)
-# 
-#     As = []
-#     Al = []
-#     El = []
-#     for (j,c) in enumerate(cliques)
-#         u = monomials(order, x[c])
-#         M = u*u'
-# 
-#         v = monomials(2*order, x[c])   
-#         push!(As, vectorize(M, indexmap(v)))
-#     
-#         v = monomials(dmax, x[c])
-#         imapc = indexmap(v)
-# 
-#         mc = length(J[j])
-#         # generate the (a,b) powers upto degree max |a| + |b| <= d  
-#         ab_d = monomials(degree, variables(ASCIIString[ "z$(i)" for i=1:2*mc ]))    
-#         p = vcat([ pineq[i] for i=J[j] ], [ 1-pineq[i] for i=J[j] ])
-#         ai, aj, av = Int[], Int[], Float64[]
-#         for (i, ab) in enumerate(ab_d)
-#             h_ab = prod(p .^ vec(ab.alpha))
-#             #println("h_$(vec(ab.alpha)): ", h_ab)
-#             ak = vectorize(h_ab, imapc)
-# 
-#             push!(ai, i*ones(ak.rowval)...)
-#             push!(aj, ak.rowval...)
-#             push!(av, ak.nzval...)                
-#         end
-#         push!(Al, sparse(ai, aj, av, length(ab_d), length(imapc)))  
-#         push!(El, vectorize(v, imap))    
-#     end
-#        
-#     BSOSProb(degree, order, f, Al, El, As)
-# end
-
 function symbol_restrict{T<:Number}(p::Poly{T}, syms::Symbols, I::Array{Int,1})
 
     if p.n == 0
@@ -434,7 +380,7 @@ function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int
         push!(J[j], i)
     end
     
-    println("J: ", J)
+    #println("J: ", J)
     As, Al, El = [], [], []
     for (j,c) in enumerate(cliques)
         symc = Symbols(obj.syms.names[c])
@@ -447,7 +393,7 @@ function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int
         mc = length(J[j])
         
         # generate the (a,b) powers upto degree max |a| + |b| <= d
-        println("mc=$(mc)")
+        #println("mc=$(mc)")
         ab_d = monomialpowers(2*mc, degree)            
         pj = [ symbol_restrict(pineq[i], symc, c) for i=J[j] ]
         
@@ -457,8 +403,8 @@ function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int
             h_ab = prod(p .^ ab)
             ak = vectorize(h_ab, dmax)
 
-            push!(ai, i*ones(ak.rowval)...)
-            push!(aj, ak.rowval...)
+            push!(ai, i*ones(ak.nzind)...)
+            push!(aj, ak.nzind...)
             push!(av, ak.nzval...)                
         end
         push!(Al, sparse(ai, aj, av, length(ab_d), binomial(length(c)+dmax,dmax)))  

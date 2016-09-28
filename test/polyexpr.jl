@@ -1,5 +1,6 @@
 let
     x, y = variables(["x", "y"])
+    
     @test (x*y).alpha == [1 1]
     @test (x*y).c == [1]
 
@@ -19,6 +20,7 @@ let
     @test ( (x+y+x*y)*(x^2-y) == x^3 + x^2*y + x^3*y - x*y - y^2 - x*y^2)
 
     @test ( [x, y]*[x, y]' == [ x^2 x*y; x*y y^2] )
+    
     @test ( [1 0; 0 2]*[x, y] == [x, 2*y])
     @test ( dot([x,y], [x,y]) == 1.0*x^2 + y^2 )
 
