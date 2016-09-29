@@ -337,8 +337,8 @@ function momentprob_chordalembedding{S,T,U}(order::Int, obj::Poly{S}, pineq::Arr
     cliques = chordal_embedding(C)
 
     momentprob_chordal(order, cliques, obj,
-                       pineq, [ clique_index(cliques, find(sum(p.alpha,1))) for p = pineq ],
-                       peq,   [ clique_index(cliques, find(sum(p.alpha,1))) for p = peq   ])
+                       pineq, [ clique_index(cliques, find(sum(p.alpha,1)), p.n) for p = pineq ],
+                       peq,   [ clique_index(cliques, find(sum(p.alpha,1)), p.n) for p = peq   ])
 end
 
 momentprob_chordalembedding{S,T}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},1}) =
@@ -375,8 +375,8 @@ function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int
     end
 
     for (i, gi) in enumerate(pineq)
-        j = clique_index(cliques, find(sum(gi.alpha,1)))
-        #println("g($(i)): $(gi) belongs to cliques($(j)): cliques[$(j)]")
+        j = clique_index(cliques, find(sum(gi.alpha,1)), n)
+        println("g($(i)): belongs to cliques[$(j)]: $(cliques[j])")
         push!(J[j], i)
     end
     
@@ -393,7 +393,7 @@ function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int
         mc = length(J[j])
         
         # generate the (a,b) powers upto degree max |a| + |b| <= d
-        #println("mc=$(mc)")
+        println("mc=$(mc)")
         ab_d = monomialpowers(2*mc, degree)            
         pj = [ symbol_restrict(pineq[i], symc, c) for i=J[j] ]
         
