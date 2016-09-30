@@ -142,7 +142,6 @@ end
 #     [ Poly{T}(vars[1].syms, a', [1]) for a in monomialpowers(vars[1].n, deg) ]    
 # end
 
-
 function moment(order::Int, syms::Symbols)
     v = monomials(order, variables(syms))
     v*v'
@@ -162,38 +161,6 @@ function moment{T<:Number}(order::Int, syms::Symbols, p::Poly{T}, I::Array{Int})
     v = monomials(order - (p.deg+1) >> 1, variables(syms)[I])
     p*v*v'
 end
-
-# function indexmap{T<:Number}(v::Array{Poly{T},1})
-#     Dict( [(v[k].alpha, k) for k=1:length(v)] )
-# end
-# 
-# linear_index(imap::Dict{Array{Int,2},Int}, p::Poly) = Int[ imap[p.alpha[i,:]] for i=1:p.m ]
-# 
-# vectorize{T<:Number}(p::Polyopt.Poly{T}, imap::Dict{Array{Int,2},Int}) = sparsevec(linear_index(imap,p), p.c, length(imap))
-# 
-# function vectorize{T<:Number}(A::AbstractArray{Poly{T}}, imap::Dict{Array{Int,2},Int})
-#     dims = length(size(A))
-#     if dims==1
-#         m, n = length(A), 1
-#     elseif dims==2
-#         m, n = size(A)
-#     else
-#         error("dimension must be <= 2")
-#     end
-#     subi = Int[]
-#     subj = Int[]
-#     val  = T[]
-#     for j=1:n
-#         for i=1:m
-#             I = linear_index(imap,A[i,j])
-#             v = A[i,j].c
-#             push!(subi, (i+(j-1)*m)*ones(Int, length(v))...)
-#             push!(subj, I...)
-#             push!(val, v...)
-#         end
-#     end
-#     sparse(subi, subj, val, m*n, length(imap))
-# end
 
 function basis_index(a::Vector{Int}, degree::Int)
     n = length(a)
@@ -244,25 +211,19 @@ end
 function momentprob{S,T,U}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},1}, peq::Array{Poly{U},1})
 
     v = monomials(2*order, variables(obj.syms))
-    #imap = indexmap(v)
-
     obj.deg <= 2*order || error("obj has degree higher than 2*order")
 
-    #p = vectorize(obj, imap)
     p = vectorize(obj, 2*order)
     mom = Array(Any, length(pineq)+1)
-    #mom[1] = vectorize(moment(order, obj.syms), imap)
     mom[1] = vectorize(moment(order, obj.syms), 2*order)
     for k=1:length(pineq)
        pineq[k].deg <= 2*order || error("pineq[$(k)] has degree higher than 2*order")
-       #mom[k+1] = vectorize(moment(order, pineq[k].syms, pineq[k]), imap)
        mom[k+1] = vectorize(moment(order, pineq[k].syms, pineq[k]), 2*order)
     end
 
     momeq = Array(Any, length(peq))
     for k=1:length(peq)
         peq[k].deg <= 2*order || error("peq[$(k)] has degree higher than 2*order")
-        #momeq[k] = vectorize(moment(order, peq[k].syms, peq[k]), imap)
         momeq[k] = vectorize(moment(order, peq[k].syms, peq[k]), 2*order)
     end
 
@@ -276,44 +237,40 @@ momentprob{S,T}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},1}) =
     momentprob(order, obj, pineq, Poly{Int}[])
 
 function momentprob_chordal{S,T,U}(order::Int, cliques::Array{Array{Int,1},1}, obj::Poly{S},
-                                   pineq::Array{Poly{T},1}, pineq_index::Array{Int,1},
-                                   peq::Array{Poly{U},1}, peq_index::Array{Int,1})
+                                   pineq::Array{Poly{T},1}, peq::Array{Poly{U},1})
 
     v = monomials(2*order, variables(obj.syms))
-    #imap = indexmap(v)
-
     obj.deg <= 2*order || error("obj has degree higher than 2*order")
     
-    #p = vectorize(obj, imap)
     p = vectorize(obj, 2*order)
-    mom = Array(Any, length(pineq) + length(cliques))
+    mom = []
     for k=1:length(cliques)
-        #mom[k] = vectorize(moment(order, obj.syms, cliques[k]), imap)
-        mom[k] = vectorize(moment(order, obj.syms, cliques[k]), 2*order)
+        push!(mom,vectorize(moment(order, obj.syms, cliques[k]), 2*order))
     end
-
     
     for k=1:length(pineq)
         pineq[k].deg <= 2*order || error("pineq[$(k)] has degree higher than 2*order")
-        #mom[length(cliques)+k] = vectorize(moment(order, pineq[k].syms, pineq[k], cliques[pineq_index[k]]), imap)
-        mom[length(cliques)+k] = vectorize(moment(order, pineq[k].syms, pineq[k], cliques[pineq_index[k]]), 2*order)
+        for j=clique_index(cliques, find(sum(pineq[k].alpha,1)), obj.n)
+            push!(mom,vectorize(moment(order, pineq[k].syms, pineq[k], cliques[j]), 2*order))
+        end
     end
 
-    momeq = Array(Any, length(peq))
+    momeq = []
     for k=1:length(peq)
         peq[k].deg <= 2*order || error("peq[$(k)] has degree higher than 2*order")
-        #momeq[k] = vectorize(moment(order, peq[k].syms, peq[k], cliques[peq_index[k]]), imap)
-        momeq[k] = vectorize(moment(order, peq[k].syms, peq[k], cliques[peq_index[k]]), 2*order)
+        for j=clique_index(cliques, find(sum(peq[k].alpha,1)), obj.n)
+            push!(momeq, vectorize(moment(order, peq[k].syms, peq[k], cliques[j]), 2*order))
+        end
     end
 
     MomentProb(order, v,  p, mom, momeq)
 end
 
-momentprob_chordal{S,T}(order::Int, cliques::Array{Array{Int,1},1}, obj::Poly{S}, pineq::Array{Poly{T},1}, pineq_index::Array{Int,1}) = 
-    momentprob_chordal(order, cliques, obj, pineq, pineq_index, Poly{Int}[], Int[])
+momentprob_chordal{S,T}(order::Int, cliques::Array{Array{Int,1},1}, obj::Poly{S}, pineq::Array{Poly{T},1}) = 
+    momentprob_chordal(order, cliques, obj, pineq, Poly{Int}[])
 
 momentprob_chordal{S}(order::Int, cliques::Array{Array{Int,1},1}, obj::Poly{S}) = 
-    momentprob_chordal(order, cliques, obj, Poly{Int}[], Int[], Poly{Int}[], Int[])
+    momentprob_chordal(order, cliques, obj, Poly{Int}[], Poly{Int}[])
                                   
 function correlative_sparsity{S,T}(obj::Poly{S}, p::Array{Poly{T},1})
     A = eye(Int,obj.n,obj.n)
@@ -327,18 +284,13 @@ function correlative_sparsity{S,T}(obj::Poly{S}, p::Array{Poly{T},1})
         I = find(sum(p[j].alpha,1))
         A[I,I] = 1
     end
-
     sparse(A)
 end
 
 function momentprob_chordalembedding{S,T,U}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},1}, peq::Array{Poly{U},1})
-
     C = correlative_sparsity(obj, [pineq; peq])
     cliques = chordal_embedding(C)
-
-    momentprob_chordal(order, cliques, obj,
-                       pineq, [ clique_index(cliques, find(sum(p.alpha,1))) for p = pineq ],
-                       peq,   [ clique_index(cliques, find(sum(p.alpha,1))) for p = peq   ])
+    momentprob_chordal(order, cliques, obj, pineq, peq)
 end
 
 momentprob_chordalembedding{S,T}(order::Int, obj::Poly{S}, pineq::Array{Poly{T},1}) =

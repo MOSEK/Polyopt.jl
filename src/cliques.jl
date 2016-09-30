@@ -56,15 +56,6 @@ end
 # If no permutation is specified, use the CHOLMOD ordering
 chordal_embedding{Tv<:Number,Ti<:Int}(A::SparseMatrixCSC{Tv,Ti}) = chordal_embedding(A, Array(Int,0))
 
-function clique_index(I::Array{Array{Int,1},1}, S::Array{Int,1})
-
-    s = IntSet(S)
-    for k=1:length(I)
-        if s <= IntSet(I[k]) return k end
-    end
-    throw(ArgumentError)
-end
-
 function clique_index(I::Array{Array{Int,1},1}, S::Array{Int,1}, n::Int)
 
     J = Int[]

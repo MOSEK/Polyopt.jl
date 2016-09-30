@@ -147,7 +147,7 @@ conj{T<:Number}(p::Poly{T}) = Poly{T}(p.syms, p.alpha, conj(p.c))
 convert{T<:Number}(::Type{Poly{T}}, a::T) = Poly{T}(convert(T,a))
 isconst{T<:Number}(p::Poly{T}) = p.m == 1 && p.n == 0
 
-function A_mul_B!{S<:Number,T<:Number}(alpha::Poly{S}, A::SparseMatrixCSC{S,Int}, x::Array{Poly{T},1}, beta::Poly{S}, y::Array{Poly{S},1})
+function A_mul_B!{S<:Number,T<:Number,U<:Number,V<:Number}(alpha::Poly{S}, A::SparseMatrixCSC{T,Int}, x::Array{Poly{U},1}, beta::Poly{V}, y::Array{Poly{V},1})
 
     for i=1:length(y)
         if beta == zero(y[i])
