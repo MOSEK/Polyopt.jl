@@ -189,11 +189,25 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
         
     appendvars(task, numvar)
 
-    # lj >= 0
-    for j=1:sum(diml)
-        putvarbound(task, j, MSK_BK_LO, 0.0, Inf)
-        #println("VARBOUND($(j)): LOWER 0.0")
-    end 
+    # bounds on lj 
+    offs = 0
+    for l=1:length(diml)
+        for j=1:diml[l]
+            if prob.lb[l][j] == -Inf
+                putvarbound(task, offs+j, MSK_BK_FR, -Inf, Inf)            
+                #println("VARBOUND($(offs+j)): FREE")
+            else
+                putvarbound(task, offs+j, MSK_BK_LO, 0.0, Inf)
+                #println("VARBOUND($(offs+j)): LOWER 0.0")
+            end
+        end
+        offs += diml[l]
+    end
+#    # lj >= 0
+#     for j=1:sum(diml)
+#         putvarbound(task, j, MSK_BK_LO, 0.0, Inf)
+#         #println("VARBOUND($(j)): LOWER 0.0")
+#     end 
     
     # fj and t free
     for j=sum(diml)+(1:sum(dimf)+1)

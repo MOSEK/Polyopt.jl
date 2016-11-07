@@ -24,6 +24,7 @@ immutable BSOSProb{T<:Number}
     Al     :: Array{Any,1}
     El     :: Array{Any,1}
     As     :: Array{Any,1}
+    lb     :: Array{Any,1}
 end
 
 include("solver_mosek.jl")
@@ -311,30 +312,41 @@ function symbol_restrict{T<:Number}(p::Poly{T}, syms::Symbols, I::Array{Int,1})
     end
 end
 
-function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int,1}}, 
-                               obj::Poly{S}, pineq::Array{Poly{T},1})
+function bsosprob_chordal{S,T,V}(degree::Int, order::Int, cliques::Array{Array{Int,1}}, 
+                                    obj::Poly{S}, pineq::Array{Poly{T},1}, peq::Array{Poly{V},1})
 
     n = obj.n
-    dmax = max(obj.deg, 2*order, degree*maximum([gi.deg for gi in pineq]))
+    
+    allp = [pineq; peq]
+    dmax = max(obj.deg, 2*order, degree*maximum([gi.deg for gi in allp]))
     m = binomial(n+dmax,dmax)
 
     x = variables(obj.syms)
     f = vectorize(obj, dmax)
 
-    J = Vector{Int}[]
+    Ji = Vector{Int}[]
     for j=1:length(cliques)
-        push!(J, [])
+        push!(Ji, [])
     end
 
     for (i, gi) in enumerate(pineq)
-        #println("g($(i)): belongs to cliques: $(L)")
         for j=clique_index(cliques, find(sum(gi.alpha,1)), n)
-            append!(J[j], i)
+            append!(Ji[j], i)
         end
     end
-    
-    #println("J: ", J)
-    As, Al, El = [], [], []
+
+    Je = Vector{Int}[]
+    for j=1:length(cliques)
+        push!(Je, [])
+    end
+
+    for (i, hi) in enumerate(peq)
+        for j=clique_index(cliques, find(sum(hi.alpha,1)), n)
+            append!(Je[j], i)
+        end
+    end
+        
+    As, Al, El, lb = [], [], [], []
     for (j,c) in enumerate(cliques)
         symc = Symbols(obj.syms.names[c])
         xc = Poly{Int}[symbol_restrict(x[i], symc, c) for i in c ]
@@ -343,32 +355,40 @@ function bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int
         M = u*u'  
         push!(As, vectorize(M, dmax))
 
-        mc = length(J[j])
+        pj = [ symbol_restrict(pineq[i], symc, c) for i=Ji[j] ]
         
-        # generate the (a,b) powers upto degree max |a| + |b| <= d
-        #println("mc=$(mc)")
-        ab_d = monomialpowers(2*mc, degree)            
-        pj = [ symbol_restrict(pineq[i], symc, c) for i=J[j] ]
+        p = vcat( pj, 
+                  [ (1-pji) for pji in pj ], 
+                  [ symbol_restrict(peq[i], symc, c) for i=Je[j] ])
         
-        p = vcat( pj, [ (1-pji) for pji in pj ])
+        ab_d = monomialpowers(length(p), degree)
+        
+        lbj = zeros(length(ab_d))
         ai, aj, av = Int[], Int[], Float64[]
         for (i, ab) in enumerate(ab_d)
             h_ab = prod(p .^ ab)
+            #println("h($(ab)): ", h_ab)
             ak = vectorize(h_ab, dmax)
 
             push!(ai, i*ones(ak.nzind)...)
             push!(aj, ak.nzind...)
-            push!(av, ak.nzval...)                
-        end
+            push!(av, ak.nzval...)         
+            
+            lbj[i] = (sum(ab[2*length(pj)+1:end]) > 0 ? -Inf : 0.0)
+        end            
         push!(Al, sparse(ai, aj, av, length(ab_d), binomial(length(c)+dmax,dmax)))  
-                
+        push!(lb, lbj)
+           
         v = monomials(dmax, x[c])    
         k = Int[ basis_index(vi, dmax) for vi=v ]
         push!(El, SparseMatrixCSC{Int,Int}(m,length(k),collect(1:length(k)+1),k,ones(Int,length(k))))
                        
     end
     
-    BSOSProb(degree, order, f, Al, El, As)
+    BSOSProb(degree, order, f, Al, El, As, lb)
 end
+
+bsosprob_chordal{S,T}(degree::Int, order::Int, cliques::Array{Array{Int,1}}, obj::Poly{S}, pineq::Array{Poly{T},1}) =
+    bsosprob_chordal(degree, order, cliques, obj, pineq, Poly{Int}[])
 
 end
