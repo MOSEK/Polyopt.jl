@@ -291,6 +291,134 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
 end
 
 
+function solve_mosek2(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
+    
+    printstream(msg::AbstractString) = print(msg)
+
+    # Create a task object and attach log stream printer
+    task = maketask()
+    if showlog  putstreamfunc(task,MSK_STREAM_LOG,printstream)  end
+    
+    Al, El, As = prob.Al, prob.El, prob.As
+    
+    m = length(Al)
+    diml = [ size(a,1) for a in Al ]
+    dimX = Int[ round(Int, sqrt(size(as,1))) for as in As ]
+
+    # variables are indexed as (l1,...,lm,t)
+    idx_l = zeros(Int, length(diml)+1)
+    idx_l[1] = 1
+    for j=1:length(diml)
+        idx_l[j+1] = idx_l[j] + diml[j]
+    end
+        
+    const_idx = Int[ 1 ]
+    for i=1:length(Al)
+        push!(const_idx, prob.El[i].rowval...)
+    end
+    
+    const_idx = unique(const_idx)
+    const_map = Dict(zip(const_idx, collect(1:length(const_idx))))
+
+    numvar = sum(diml) + 1
+    numcon = length(const_idx)
+    numbarvar = m
+            
+    appendvars(task, numvar)
+
+    # bounds on lj 
+    offs = 0
+    for l=1:m
+        for j=1:diml[l]
+            if prob.lb[l][j] == -Inf
+                putvarbound(task, offs+j, MSK_BK_FR, -Inf, Inf)
+                #println("VARBOUND($(offs+j)): FREE")            
+            else
+                putvarbound(task, offs+j, MSK_BK_LO, 0.0, Inf)
+                #println("VARBOUND($(offs+j)): LOWER 0.0")
+            end
+        end
+        offs += diml[l]
+    end
+    
+    # t free
+    putvarbound(task, numvar, MSK_BK_FR, -Inf, Inf)
+    
+    putcj(task, numvar, 1.0)
+
+    # Append matrix variables
+    appendbarvars(task, dimX)
+
+    # Add constraints
+    appendcons(task, numcon)
+     
+    const_idx = Int[ 1 ]
+    for i=1:length(prob.Al)
+        push!(const_idx, prob.El[i].rowval...)
+    end
+     
+    const_idx = sort(unique(const_idx))
+    const_map = Dict(zip(const_idx, collect(1:length(const_idx))))
+
+    f = prob.obj[const_idx]
+    
+    At = hcat([ El[i]*Al[i]' for i=1:m ]...)'
+    
+    for k=const_idx
+        i = const_map[k]
+
+        k1, k2 = At.colptr[k], At.colptr[k+1]-1                    
+        subj = At.rowval[k1:k2]            
+        val  = At.nzval[k1:k2]                
+            
+        if i==1
+            push!(subj, numvar)
+            push!(val, 1.0)
+        end 
+        
+        putarow(task, i, subj, val)    
+        putconbound(task, i, MSK_BK_FX, f[i], f[i])                        
+        #println("CONSTRAINT A($(i)): $(subj), $(val), b($(i))=$(f[i])")        
+    end
+     
+    for j=1:numbarvar
+        Asj = (El[j]*As[j]')'        
+        for k=const_idx
+            i = const_map[k]
+            k1, k2 = Asj.colptr[k], Asj.colptr[k+1]-1
+            if k2>=k1
+                subk, subl = ind2sub( (dimX[j], dimX[j]), Asj.rowval[k1:k2] )
+                I = subk .>= subl            
+                aij = appendsparsesymmat(task, dimX[j], subk[I], subl[I], Asj.nzval[k1:k2][I])
+                #println("BARAIJ($(i),$(j)): $(subk[I]), $(subl[I]), $(As[j].nzval[k1:k2][I])")
+                putbaraij(task, i, j, [aij], [1.0])
+            end
+        end                 
+    end
+        
+    # Input the objective sense (minimize/maximize)
+    putobjsense(task,MSK_OBJECTIVE_SENSE_MAXIMIZE)
+
+    putparam(task, "MSK_IPAR_NUM_THREADS", "4")
+    putparam(task, "MSK_DPAR_INTPNT_CO_TOL_REL_GAP", string(tolrelgap))
+    
+    # Write .task file
+    writetask(task, "polyopt.task")
+
+    # Solve the problem and print summary
+    optimize(task)
+    solutionsummary(task,MSK_STREAM_MSG)
+
+    # Get status information about the solution
+    solsta = getsolsta(task,MSK_SOL_ITR)
+
+    X = [ symm(getbarxj(task, MSK_SOL_ITR, j), Int(sqrt(size(As[j],1)))) for j=1:m ]    
+    l = [ getxxslice(task, MSK_SOL_ITR, idx_l[j], idx_l[j+1]) for j=1:m ]        
+    t = getxxslice(task, MSK_SOL_ITR, numvar, numvar+1)[1]
+    y = gety(task, MSK_SOL_ITR)
+    X, t, l, y    
+end
+
 
 function symm{T<:Number}(x::Array{T,1}, n::Int)
     X = zeros(n,n)

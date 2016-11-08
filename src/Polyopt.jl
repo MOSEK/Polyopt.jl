@@ -3,6 +3,7 @@ module Polyopt
 export solve_mosek, monomials
 export MomentProb, momentprob, momentprob_chordal, momentprob_chordalembedding 
 export BSOSProb, bsosprob_chordal, bsosprob_chordal2
+export solve_mosek2
 
 import Base.^, Base.start, Base.next, Base.done, Base.sub, Base.length
 
