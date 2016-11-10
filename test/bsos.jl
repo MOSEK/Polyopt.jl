@@ -9,7 +9,7 @@ let
 
     I = Array{Int,1}[ [1], [2] ]
     prob = bsosprob_chordal(1, 1, I, f, g)
-    X, t, l, b, y = solve_mosek(prob)
+    X, t, l, y = solve_mosek(prob)
 end
 
 # P4_2 from Weisser's paper
@@ -25,7 +25,7 @@ let
          
     I = Array{Int,1}[ [1,2,3,4] ]
     prob = bsosprob_chordal(1, 1, I, f, g)
-    X, t, l, b, y = solve_mosek(prob)
+    X, t, l, y = solve_mosek(prob)
 end             
 
 # P4_4 from Weisser's paper (we cannot reproduce bounds)
@@ -41,7 +41,7 @@ let
           
     I = Array{Int,1}[ [1,2,3,4] ]
     prob = bsosprob_chordal(2, 2, I, f, g)
-    X, t, l, b, y = solve_mosek(prob)
+    X, t, l, y = solve_mosek(prob)
 end
 
 # P4_6 from Weisser's paper
@@ -57,7 +57,7 @@ let
       
     I = Array{Int,1}[ [1,2,3,4] ]
     prob = bsosprob_chordal(3, 3, I, f, g)
-    X, t, l, b, y = solve_mosek(prob)
+    X, t, l, y = solve_mosek(prob)
 end
 
 # P4_8 from Weisser's paper
@@ -73,7 +73,7 @@ let
 
     I = Array{Int,1}[ [1,2,3,4] ]
     prob = bsosprob_chordal(3, 4, I, f, g)
-    X, t, l, b, y = solve_mosek(prob)
+    X, t, l, y = solve_mosek(prob)
 end
 
 # Haverly1 from Marandi's paper 
@@ -92,7 +92,7 @@ let
     I = Polyopt.chordal_embedding(Polyopt.correlative_sparsity(f,g))
 
     prob = bsosprob_chordal(3, 2, I, f, g)
-    X, t, l, b, y = solve_mosek(prob)
+    X, t, l, y = solve_mosek(prob)
 end
 
 # Generalized Rosenbrock function
@@ -109,6 +109,6 @@ let
     g = vcat(Polyopt.Poly{Int}[x[i] for i=1:n], Polyopt.Poly{Int}[2 - sum([xk^2 for xk=x[Ik]]) for Ik in I])
 
     prob = bsosprob_chordal(3, 2, I, f, g);
-    X, t, l, b, y = solve_mosek(prob);
+    X, t, l, y = solve_mosek(prob);
     t
 end

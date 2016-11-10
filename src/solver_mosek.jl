@@ -140,7 +140,7 @@ end
 
 trilind(k::Vector{Int}, n::Int) = Int[i + (j-1)*(n-1) - (j-1)*(j-2)>>1 for (i,j) = zip(ind2sub((n, n), k)...) ]
 
-function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
+function solve_mosek_no_elim(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     
     printstream(msg::AbstractString) = print(msg)
 
@@ -179,14 +179,6 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     numcon = sum(dimf) + length(const_idx)
     numbarvar = m
             
-#     println("diml:", diml)
-#     println("dimf:", dimf)
-#     println("dimX:", dimX)
-#     println("NUMVAR=", numvar)
-#     println("NUMBARVAR=", numbarvar)
-#     println("DIMBARVAR=", dimX)
-#     println("NUMCON=", numcon)
-        
     appendvars(task, numvar)
 
     # bounds on lj 
@@ -203,11 +195,6 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
         end
         offs += diml[l]
     end
-#    # lj >= 0
-#     for j=1:sum(diml)
-#         putvarbound(task, j, MSK_BK_LO, 0.0, Inf)
-#         #println("VARBOUND($(j)): LOWER 0.0")
-#     end 
     
     # fj and t free
     for j=sum(diml)+(1:sum(dimf)+1)
@@ -228,7 +215,7 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     for j=1:m
         #println("Block $(j)")
         for i=1:dimf[j]
-            k1, k2 = Al[j].colptr[i], Al[j].colptr[i+1]-1                    
+            k1, k2 = Al[j].colptr[i], Al[j].colptr[i+1]-1
             subj = [idx_l[j]-1 + Al[j].rowval[k1:k2]; idx_f[j]-1 + i]            
             val  = [Al[j].nzval[k1:k2]; -1.0]                
             putarow(task, idx_const, subj, val)    
@@ -291,7 +278,20 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
 end
 
 
-function solve_mosek2(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
+function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
+ 
+    function getrow(A, E, j)    
+        sub, val = Int[], Float64[]
+        i = findfirst(E.rowval, j)
+        if i>0
+            k1, k2 = A.colptr[i], A.colptr[i+1]-1
+            sub = A.rowval[k1:k2]
+            val = A.nzval[k1:k2]
+        else
+            sub, val = Int[], Float64[]
+        end
+        sub, val                
+    end
     
     printstream(msg::AbstractString) = print(msg)
 
@@ -361,41 +361,40 @@ function solve_mosek2(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     const_map = Dict(zip(const_idx, collect(1:length(const_idx))))
 
     f = prob.obj[const_idx]
-    
-    At = hcat([ El[i]*Al[i]' for i=1:m ]...)'
-    
-    for k=const_idx
-        i = const_map[k]
 
-        k1, k2 = At.colptr[k], At.colptr[k+1]-1                    
-        subj = At.rowval[k1:k2]            
-        val  = At.nzval[k1:k2]                
-            
-        if i==1
-            push!(subj, numvar)
-            push!(val, 1.0)
-        end 
-        
-        putarow(task, i, subj, val)    
-        putconbound(task, i, MSK_BK_FX, f[i], f[i])                        
-        #println("CONSTRAINT A($(i)): $(subj), $(val), b($(i))=$(f[i])")        
-    end
-     
-    for j=1:numbarvar
-        Asj = (El[j]*As[j]')'        
-        for k=const_idx
-            i = const_map[k]
-            k1, k2 = Asj.colptr[k], Asj.colptr[k+1]-1
-            if k2>=k1
-                subk, subl = ind2sub( (dimX[j], dimX[j]), Asj.rowval[k1:k2] )
-                I = subk .>= subl            
-                aij = appendsparsesymmat(task, dimX[j], subk[I], subl[I], Asj.nzval[k1:k2][I])
-                #println("BARAIJ($(i),$(j)): $(subk[I]), $(subl[I]), $(As[j].nzval[k1:k2][I])")
-                putbaraij(task, i, j, [aij], [1.0])
+    for (i,k)=enumerate(const_idx)    
+        subi = Int[]
+        vali = Float64[]    
+        offs = 0
+        for j=1:m
+            subj, valj = getrow(Al[j], El[j], k)                
+            if length(subj) > 0
+                push!(subi, (offs+subj)...)
+                push!(vali, valj...)
             end
-        end                 
+            offs += size(Al[j],1)
+        end
+        if i==1
+            push!(subi, numvar)
+            push!(vali, 1.0)
+        end
+
+        putarow(task, i, subi, vali)    
+        putconbound(task, i, MSK_BK_FX, f[i], f[i])                        
+        #println("CONSTRAINT A($(i)): $(subi), $(vali), b($(i))=$(f[i])")                            
+       
+        for j=1:m
+            subj, valj = getrow(As[j], El[j], k)
+            if length(subj) >0
+                subk, subl = ind2sub( (dimX[j], dimX[j]), subj )
+                I = subk .>= subl            
+                aij = appendsparsesymmat(task, dimX[j], subk[I], subl[I], valj[I])
+                #println("BARAIJ($(i),$(j)): $(subk[I]), $(subl[I]), $(valj[I])")
+                putbaraij(task, i, j, [aij], [1.0])            
+            end
+        end 
     end
-        
+                           
     # Input the objective sense (minimize/maximize)
     putobjsense(task,MSK_OBJECTIVE_SENSE_MAXIMIZE)
 
