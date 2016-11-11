@@ -122,7 +122,7 @@ let
     @test Polyopt.evalpoly(g, xo) > -1e-4
     
     # test that f(x1,x2) - t - g(x1,x2)*s(x1,x2) - h(x1,x2)*w(x1,x2) is SOS,  where s1(x1,x2) = v'*X[2]*v is SOS, but w(x1,x2) = v'*Z[1]*z is not     
-    #@test approxzero(f - t - (dot(u, X[1]*u) + g*dot(v, X[2]*v) + h*dot(v, Z[1]*v)))
+    @test approxzero(f - t - (dot(u, X[1]*u) + g*dot(v, X[2]*v) + h*dot(v, Z[1]*v)))
 end    
 
 # Example 6.23 "Sums of Squares, Moment Matrices and Polynomial Optimization", M. Laurent
@@ -363,48 +363,38 @@ end
 let
     println("Chordal relaxation")
     
-    x1,x2,x3,x4 = variables(["x1","x2","x3","x4"])
+    x1,x2,x3 = variables(["x1","x2","x3"])
 
-    f = x1-x2+x3-x4 - (x1^3+x2^3+x3^3+x4^3) 
-    g = [-1-x1*x2, 1-x1*x2,
-         -1-x2*x3, 1-x2*x3,
-         -1-x3*x4, 1-x3*x4,
-          1-x1^2,
-          1-x2^2,
-          1-x3^2,
-          1-x4^2 ]
+    f = x1-x2+x3 
+    g = [1-x1*x2,
+         1-x2*x3,
+        1-x1^2,
+        1-x2^2,
+        1-x3^2 ]
 
-    prob = momentprob(2, f, g)
+    order = 2     
+    prob = momentprob(order, f, g)
     X, Z, t, y, solsta = solve_mosek(prob);
-    xo = Polyopt.vectorize([x1,x2,x3,x4],4)*y
+    xo = Polyopt.vectorize([x1,x2,x3],2*order)*y
     @test all( [ Polyopt.evalpoly(gi, xo) for gi=g ] .> -1e-4 )
      
-    K = Array{Int,1}[ [1,2], [2,3], [3,4] ]
-    
-    probc = momentprob_chordal(2, K, f, g) 
-
+    K = Array{Int,1}[ [1,2], [2,3] ]    
+    probc = momentprob_chordal(order, K, f, g) 
     Xc, Zc, tc, yc, solstac = solve_mosek(probc);
-    xo = Polyopt.vectorize([x1,x2,x3,x4],4)*yc
+    xo = Polyopt.vectorize([x1,x2,x3],2*order)*yc
     @test all( [ Polyopt.evalpoly(gi, xo) for gi=g ] .> -1e-4 )
     
-#     u1 = monomials(2, [x1,x2,x3,x4][K[1]])
-#     u2 = monomials(2, [x1,x2,x3,x4][K[2]])
-#     u3 = monomials(2, [x1,x2,x3,x4][K[3]])
-#     v1 = monomials(1, [x1,x2,x3,x4][K[1]]) 
-#     v2 = monomials(1, [x1,x2,x3,x4][K[2]]) 
-#     v3 = monomials(1, [x1,x2,x3,x4][K[3]]) 
-#      
-#     r = dot(u1, Xc[1]*u1) + dot(u2, Xc[2]*u2) + dot(u3, Xc[3]*u3) + 
-#         g[1]*dot(v1, Xc[4]*v1) +
-#         g[2]*dot(v1, Xc[5]*v1) +
-#         g[3]*dot(v2, Xc[6]*v2) +
-#         g[4]*dot(v2, Xc[7]*v2) +
-#         g[5]*dot(v3, Xc[8]*v3) +
-#         g[6]*dot(v3, Xc[9]*v3) +
-#         g[7]*dot(v1, Xc[10]*v1) +
-#         g[8]*dot(v2, Xc[11]*v2) +
-#         g[9]*dot(v3, Xc[12]*v3) +
-#         g[10]*dot(v3, Xc[13]*v3)
-#     
-#     @test approxzero( f - t - r )
+    u1 = monomials(order, [x1,x2,x3][K[1]])
+    u2 = monomials(order, [x1,x2,x3][K[2]])
+    v1 = monomials(order-1, [x1,x2,x3][K[1]]) 
+    v2 = monomials(order-1, [x1,x2,x3][K[2]]) 
+     
+    r = dot(u1, Xc[1]*u1) + dot(u2, Xc[2]*u2) +  
+            g[1]*dot(v1, Xc[3]*v1) +  
+            g[2]*dot(v2, Xc[4]*v2) + 
+            g[3]*dot(v1, Xc[5]*v1) +
+            g[4]*(dot(v1, Xc[6]*v1) + dot(v2, Xc[7]*v2)) +
+            g[5]*dot(v2, Xc[8]*v2)
+        
+    @test approxzero( f - t - r )
 end

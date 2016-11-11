@@ -82,9 +82,13 @@ function solve_mosek(prob::MomentProb; tolrelgap=1e-10, showlog=true)
                     appendcons(task, 1)
                     added_const = true
                 end                
-                
-                subj = trilind( prob.eq[j].rowval[k1:k2], eqdim[j] ) + eqidx[j] + 1
-                putaijlist(task, numconst*ones(Int, length(subj)), subj, prob.eq[j].nzval[k1:k2])
+
+                subk, subl = ind2sub( (eqdim[j], eqdim[j]), prob.eq[j].rowval[k1:k2] )
+                trilidx = subk .>= subl
+                subj = trilind( prob.eq[j].rowval[k1:k2][trilidx], eqdim[j] ) + eqidx[j] + 1
+                putaijlist(task, numconst*ones(Int, length(subj)), subj, prob.eq[j].nzval[k1:k2][trilidx])
+#                 subj = trilind( prob.eq[j].rowval[k1:k2], eqdim[j] ) + eqidx[j] + 1
+#                 putaijlist(task, numconst*ones(Int, length(subj)), subj, prob.eq[j].nzval[k1:k2])
             end
         end
         
