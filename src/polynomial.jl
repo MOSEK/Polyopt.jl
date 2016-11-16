@@ -28,7 +28,6 @@ end
 
 Poly{T<:Number}(syms::Symbols, alpha::Array{Int,2}, c::Array{T,1}) = Poly{T}(syms, alpha, c)
 Poly{T<:Number}(c::T) = Poly{T}(c)
-#Poly{T<:Number}(c::T) = Poly(c)
 
 convert{S,T}(::Type{Poly{S}}, p::Poly{T}) = Poly(p.syms, p.alpha, convert(Array{S}, p.c))
 convert{S,T}(::Type{Poly{S}}, c::T) = Poly{promote_type(S,T)}(p.syms, p.alpha, convert(promote_type(S,T), c))
@@ -197,7 +196,7 @@ function simplify{T<:Number}(p::Poly{T})
     for k=1:g.m
         if ~labeled[k]
             for j=k+1:g.m
-                if (~labeled[j] && g.alpha[k,:] == g.alpha[j,:])
+                if (~labeled[j] && view(g.alpha,k,:) == view(g.alpha,j,:))
                     g.c[k] += g.c[j]
                     labeled[j] = true
                 end
@@ -220,14 +219,14 @@ function simplify{T<:Number}(p::Poly{T})
     lgt = 1
     for k=1:g.m
         if ~labeled[k]
-            alpha[lgt,:] = g.alpha[k,:]
+            alpha[lgt,:] = view(g.alpha,k,:)
             c[lgt] = g.c[k]
             lgt += 1
         end
     end
-    perm = sortperm([ vec(alpha[i,1:g.n]) for i=1:size(alpha,1)], lt=lexless)
-
-    Poly{T}(g.syms, alpha[perm,:], c[perm])
+    #perm = sortperm([ view(alpha,i,1:g.n) for i=1:size(alpha,1)], lt=lexless)
+    #Poly{T}(g.syms, alpha[perm,:], c[perm])
+    Poly{T}(g.syms, alpha, c)
 end
 
 function truncate{T<:Number}(p::Poly{T}, threshold=1e-10)

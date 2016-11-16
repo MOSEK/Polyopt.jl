@@ -60,89 +60,73 @@ function next(m::MonomialPowers, powers::Vector{Int})
     powers, state
 end
 
-function _merge_monomials{T<:Number}(a::Array{Poly{T},1}, b::Array{Poly{T},1})
-
-    n, m = length(a), length(b)
-    y = Array(Poly{T}, n + m)
-    
-    i, j, k = 1, 1, 1
-    
-    while (i <= n) && (j <= m)        
-        if a[i] <= b[j]
-            y[k] = a[i]
-            i += 1
-        else
-            y[k] = b[j]
-            j += 1        
-        end
-        k += 1
-    end
-    
-    if i <= n
-        y[k:n+m] = a[i:n]
-    else
-        y[k:n+m] = b[j:m]
-    end
-    
-    y
-end
-
-# compute all monomials of degree 'deg' or less
-function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
-
-    if length(vars) == 1        
-        monoms = Array(Poly{T}, deg+1)
-        monoms[1] = vars[1]^0
-        for k=1:deg            
-            monoms[k+1] = monoms[k] * vars[1] 
-        end
-    else
-        x, tail = vars[1], vars[2:end]
-        m = monomials(deg, tail)
-        monoms = m[:]
-
-        t = x
-        for i=1:deg
-            monoms = _merge_monomials(monoms, monomials(deg-i, tail)*t)
-            t = t*x
-        end
-    end
-    monoms
-end
-
+# function _merge_monomials{T<:Number}(a::Array{Poly{T},1}, b::Array{Poly{T},1})
+# 
+#     n, m = length(a), length(b)
+#     y = Array(Poly{T}, n + m)
+#     
+#     i, j, k = 1, 1, 1
+#     
+#     while (i <= n) && (j <= m)        
+#         if a[i] <= b[j]
+#             y[k] = a[i]
+#             i += 1
+#         else
+#             y[k] = b[j]
+#             j += 1        
+#         end
+#         k += 1
+#     end
+#     
+#     if i <= n
+#         y[k:n+m] = a[i:n]
+#     else
+#         y[k:n+m] = b[j:m]
+#     end
+#     
+#     y
+# end
+# 
+# # compute all monomials of degree 'deg' or less
 # function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
 # 
-#     # find index of element to increment
-#     function findindex(a::Array{Int,2}, deg::Int)
-#         k=length(a)    
-#         while (k>1)
-#             if sum(a[1:k]) < deg
-#                 break
-#             end
-#             k -= 1
-#         end     
-#         k
+#     if length(vars) == 1        
+#         monoms = Array(Poly{T}, deg+1)
+#         monoms[1] = vars[1]^0
+#         for k=1:deg            
+#             monoms[k+1] = monoms[k] * vars[1] 
+#         end
+#     else
+#         x, tail = vars[1], vars[2:end]
+#         m = monomials(deg, tail)
+#         monoms = m[:]
+# 
+#         t = x
+#         for i=1:deg
+#             monoms = _merge_monomials(monoms, monomials(deg-i, tail)*t)
+#             t = t*x
+#         end
 #     end
-#     
-#     n = length(vars)
-#     m = binomial(n+deg,deg)
-#     
-#     a = zeros(Int, 1, n)    
-#     r = Array(Poly{T}, m)            
-#     
-#     for i=1:m
-#         r[i] = Poly{T}( vars[1].syms, copy(a), [1] )
-#     
-#         k = findindex(a, deg)
-#         a[k+1:end] = 0                        
-#         a[k] += 1
-#     end
-#     r
+#     monoms
 # end
 # 
 # function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
 #     [ Poly{T}(vars[1].syms, a', [1]) for a in monomialpowers(vars[1].n, deg) ]    
 # end
+
+function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
+    n = length(vars)
+    I = [ findfirst(vi.alpha) for vi=vars ]
+    
+    v = Array(Poly{Int}, binomial(n+deg, deg))
+    alpha = zeros(Int, 1, vars[1].n)
+    for (i,a)=enumerate(monomialpowers(n, deg))            
+        alpha[I] = a
+        v[i] = Poly(vars[1].syms, copy(alpha), [1])
+        alpha[I] = 0
+    end
+    v        
+end
 
 function moment(order::Int, syms::Symbols)
     v = monomials(order, variables(syms))
@@ -355,7 +339,7 @@ function bsosprob_chordal{S,T,V}(degree::Int, order::Int, cliques::Array{Array{I
         u = monomials(order, xc)
         M = u*u'  
         push!(As, vectorize(M, dmax))
-
+        
         pj = [ symbol_restrict(pineq[i], symc, c) for i=Ji[j] ]
         
         p = vcat( pj, 
@@ -366,13 +350,19 @@ function bsosprob_chordal{S,T,V}(degree::Int, order::Int, cliques::Array{Array{I
         
         lbj = zeros(length(ab_d))
         ai, aj, av = Int[], Int[], Float64[]
+        lgta = binomial(obj.n+dmax,dmax)
         for (i, ab) in enumerate(ab_d)
-            h_ab = 1.0
-            for l=1:length(ab)
-                h_ab *= p[l]^(ab[l])
+            
+            # for efficiency reasons we unroll   h_ab = prod(p .^ ab)
+            h_ab = p[1]^ab[1]
+            for l=2:length(ab)
+                if ab[l] == 1
+                    h_ab *= p[l]
+                elseif ab[l] > 1
+                    h_ab *= p[l]^(ab[l])
+                end
             end
-            #h_ab = prod(p .^ ab)
-            ak = vectorize(h_ab, dmax)
+            ak = SparseVector(lgta, linear_index(h_ab, dmax), h_ab.c)
 
             push!(ai, i*ones(ak.nzind)...)
             push!(aj, ak.nzind...)
@@ -383,8 +373,14 @@ function bsosprob_chordal{S,T,V}(degree::Int, order::Int, cliques::Array{Array{I
         push!(Al, sparse(ai, aj, av, length(ab_d), binomial(length(c)+dmax,dmax)))  
         push!(lb, lbj)
            
-        v = monomials(dmax, x[c])    
-        k = Int[ basis_index(vi, dmax) for vi=v ]
+        k = Array(Int, binomial(length(c)+dmax, dmax))
+        alpha = zeros(Int, n)
+        for (i,a)=enumerate(monomialpowers(length(c), dmax))            
+            alpha[c] = a
+            k[i] = basis_index(alpha, dmax)
+            alpha[c] = 0
+        end
+        
         push!(El, SparseMatrixCSC{Int,Int}(m,length(k),collect(1:length(k)+1),k,ones(Int,length(k))))
                        
     end
