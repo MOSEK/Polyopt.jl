@@ -367,7 +367,11 @@ function bsosprob_chordal{S,T,V}(degree::Int, order::Int, cliques::Array{Array{I
         lbj = zeros(length(ab_d))
         ai, aj, av = Int[], Int[], Float64[]
         for (i, ab) in enumerate(ab_d)
-            h_ab = prod(p .^ ab)
+            h_ab = 1.0
+            for l=1:length(ab)
+                h_ab *= p[l]^(ab[l])
+            end
+            #h_ab = prod(p .^ ab)
             ak = vectorize(h_ab, dmax)
 
             push!(ai, i*ones(ak.nzind)...)

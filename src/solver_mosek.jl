@@ -297,6 +297,14 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
         sub, val                
     end
     
+    function constraint_size(A, E, j)
+        sz = (j == 1 ? 1 : 0)
+        for k=1:length(A)
+            sz += length(getrow(A[k], E[k], j)[1])            
+        end
+        sz
+    end
+    
     printstream(msg::AbstractString) = print(msg)
 
     # Create a task object and attach log stream printer
@@ -367,25 +375,20 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     f = prob.obj[const_idx]
 
     for (i,k)=enumerate(const_idx)    
-        subi = Int[]
-        vali = Float64[]    
         offs = 0
         for j=1:m
             subj, valj = getrow(Al[j], El[j], k)                
             if length(subj) > 0
-                push!(subi, (offs+subj)...)
-                push!(vali, valj...)
+                for r=1:length(subj)
+                    putaij(task, i, subj[r]+offs, valj[r])
+                end
             end
             offs += size(Al[j],1)
         end
         if i==1
-            push!(subi, numvar)
-            push!(vali, 1.0)
+            putaij(task, i, numvar, 1.0)
         end
-
-        putarow(task, i, subi, vali)    
         putconbound(task, i, MSK_BK_FX, f[i], f[i])                        
-        #println("CONSTRAINT A($(i)): $(subi), $(vali), b($(i))=$(f[i])")                            
        
         for j=1:m
             subj, valj = getrow(As[j], El[j], k)
@@ -393,11 +396,46 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
                 subk, subl = ind2sub( (dimX[j], dimX[j]), subj )
                 I = subk .>= subl            
                 aij = appendsparsesymmat(task, dimX[j], subk[I], subl[I], valj[I])
-                #println("BARAIJ($(i),$(j)): $(subk[I]), $(subl[I]), $(valj[I])")
                 putbaraij(task, i, j, [aij], [1.0])            
             end
         end 
     end
+
+#     for (i,k)=enumerate(const_idx)
+#         lgt = constraint_size(Al, El, k)    
+#         subi = Array(Int, lgt)
+#         vali = Array(Float64, lgt)    
+#         subj_offs = 0
+#         subi_offs = 0
+#         for j=1:m
+#             subj, valj = getrow(Al[j], El[j], k)                
+#             if length(subj) > 0
+#                 subi[subi_offs + (1:length(subj))] = subj+subj_offs
+#                 vali[subi_offs + (1:length(subj))] = valj
+#             end
+#             subj_offs += size(Al[j],1)
+#             subi_offs += length(subj)
+#         end    
+#         if i==1
+#             subi[subi_offs+1] = numvar
+#             vali[subi_offs+1] = 1.0
+#         end
+# 
+#         putarow(task, i, subi, vali)    
+#         putconbound(task, i, MSK_BK_FX, f[i], f[i])                        
+#         #println("CONSTRAINT A($(i)): $(subi), $(vali), b($(i))=$(f[i])")                            
+#        
+#         for j=1:m
+#             subj, valj = getrow(As[j], El[j], k)
+#             if length(subj) >0
+#                 subk, subl = ind2sub( (dimX[j], dimX[j]), subj )
+#                 I = subk .>= subl            
+#                 aij = appendsparsesymmat(task, dimX[j], subk[I], subl[I], valj[I])
+#                 #println("BARAIJ($(i),$(j)): $(subk[I]), $(subl[I]), $(valj[I])")
+#                 putbaraij(task, i, j, [aij], [1.0])            
+#             end
+#         end 
+#     end
                            
     # Input the objective sense (minimize/maximize)
     putobjsense(task,MSK_OBJECTIVE_SENSE_MAXIMIZE)
