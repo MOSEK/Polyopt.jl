@@ -124,10 +124,26 @@ end
 function ^{T<:Number}(p::Poly{T}, a::Int)
     if a<0 error("power must be nonnegative") end
     if a==0 return Poly{T}(p.syms, zeros(Int, 1, p.n), [one(T)]) end
+    if a==1 return Poly{T}(p.syms, p.alpha, p.c) end
     if p.m == 1 return Poly{T}(p.syms, p.alpha*a, p.c.^a) end
 
-    r = Poly{T}(p)
-    for k=2:a r *= p end
+    powers = Array(Poly{T}, Int(1+ceil(log2(a))))    
+    powers[1] = p
+    k = 1
+    while 2^k<=a
+        powers[k+1] = powers[k]*powers[k]
+        k += 1
+    end
+
+    b = 2^(k-1)
+    r = powers[k]
+    while ( b != a)
+        k -= 1
+        if (b + 2^(k-1) <= a)
+            b += 2^(k-1)
+            r = r*powers[k]
+        end            
+    end
     r
 end
 
@@ -138,13 +154,17 @@ typealias MatOrVec{T} Union{Array{T,1},Array{T,2}}
 *{T<:Number,S<:Number}(a::Poly{T}, v::MatOrVec{Poly{S}}) = reshape(Poly{promote_type(T,S)}[ a*vi for vi=v ], size(v))
 *{T<:Number,S<:Number}(v::MatOrVec{Poly{S}}, a::Poly{T}) = reshape(Poly{promote_type(T,S)}[ a*vi for vi=v ], size(v))
 
-=={S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) = (p1-p2).n == 0
+function =={S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T}) 
+    r = p1-p2
+    r.m == 0 || r.n == 0
+end
+
 =={S<:Number,T<:Number}(p::Poly{S}, c::T) = p == Poly(c) 
 =={S<:Number,T<:Number}(c::S, p::Poly{T}) = p == Poly(c) 
 
 conj{T<:Number}(p::Poly{T}) = Poly{T}(p.syms, p.alpha, conj(p.c))
 convert{T<:Number}(::Type{Poly{T}}, a::T) = Poly{T}(convert(T,a))
-isconst{T<:Number}(p::Poly{T}) = p.m == 1 && p.n == 0
+isconst{T<:Number}(p::Poly{T}) = (p.m == 0 || p.n == 0)
 
 function A_mul_B!{S<:Number,T<:Number,U<:Number,V<:Number}(alpha::Poly{S}, A::SparseMatrixCSC{T,Int}, x::Array{Poly{U},1}, beta::Poly{V}, y::Array{Poly{V},1})
 
@@ -170,9 +190,9 @@ transpose{T<:Number}(p::Poly{T}) = p
 function promote_poly{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
     if (p1.syms == p2.syms) || (isconst(p1) && isconst(p2)) return (p1, p2) end
     if isconst(p1) && ~isconst(p2)
-        return (Poly{S}(p2.syms, zeros(Int, 1, p2.n), p1.c), p2)
+        return (Poly{S}(p2.syms, zeros(Int, p1.m, p2.n), p1.c), p2)
     elseif ~isconst(p1) && isconst(p2)
-        return (p1, Poly{T}(p1.syms, zeros(Int, 1, p1.n), p2.c))
+        return (p1, Poly{T}(p1.syms, zeros(Int, p2.m, p1.n), p2.c))
     else
         error("incompatible monomial bases")
     end
@@ -229,6 +249,38 @@ function simplify{T<:Number}(p::Poly{T})
     Poly{T}(g.syms, alpha, c)
 end
 
+# combine identical terms and remove zero terms
+# function simplify{T<:Number}(p::Poly{T})
+# 
+#     if (p.n == 0 || p.m == 0) 
+#         return p
+#     end
+#     
+#     y = p.alpha*rand(p.n)
+#     perm = sortperm(y)
+#     
+#     first = Array(Int, p.m)
+#     c = Array(T, p.m)
+#     
+#     l = 1
+#     first[l] = 1
+#     c[l] = p.c[perm[1]]
+#     
+#     for k=2:p.m
+#         if y[perm[k]] == y[perm[first[l]]]
+#             c[l] += p.c[perm[k]]
+#         else
+#             l += 1
+#             first[l] = k
+#             c[l] = p.c[perm[k]]
+#         end
+#     end
+# 
+#     I = view(c,1:l) .!= 0    
+#     y = Poly{T}(p.syms, p.alpha[perm[view(first,1:l)[I]],:], view(c,1:l)[I])
+#     order(y)
+# end
+
 function truncate{T<:Number}(p::Poly{T}, threshold=1e-10)
     lgt = 0
     labeled = falses(p.m)
@@ -265,7 +317,13 @@ function isless{T<:Number}(p1::Poly{T}, p2::Poly{T})
     lexless(p1.alpha, p2.alpha)
 end
 
-
+function order{T<:Number}(p::Poly{T})
+    c = 1:size(p.alpha,2)
+    rows = [ view(p.alpha,i,c) for i=1:size(p.alpha,1) ]
+    perm = sortperm(rows, order=Base.Order.Lexicographic)
+    Poly{T}(p.syms, p.alpha[perm,:], p.c[perm])
+end
+    
 # graded inverse lexicographic order (lowest total order first, then reverse lex)
 # function grilex_isless(a::Array{Int}, b::Array{Int})
 #     i, j = sum(a), sum(b)

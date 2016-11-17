@@ -358,7 +358,9 @@ function bsosprob_chordal{S,T,V}(degree::Int, order::Int, cliques::Array{Array{I
             for l=2:length(ab)
                 if ab[l] == 1
                     h_ab *= p[l]
-                elseif ab[l] > 1
+                elseif ab[l] == 2
+                    h_ab *= p[l]*p[l]
+                elseif ab[l] > 2
                     h_ab *= p[l]^(ab[l])
                 end
             end

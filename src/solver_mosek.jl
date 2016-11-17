@@ -172,11 +172,24 @@ function solve_mosek_no_elim(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
         idx_f[j+1] = idx_f[j] + dimf[j]
     end    
     
-    const_idx = Int[ 1 ]
-    for i=1:length(Al)
-        push!(const_idx, prob.El[i].rowval...)
-    end
+    l = 1
+    for k=1:length(El)
+        l += nnz(El[k])
+    end    
+    const_idx = Array(Int, l)
+    const_idx[1] = 1
+    l = 1
+    for k=1:length(El)
+        const_idx[l + (1:nnz(El[k]))] = El[k].rowval
+        l += nnz(El[k])
+    end        
     const_idx = unique(const_idx)
+#     
+#     const_idx = Int[ 1 ]
+#     for i=1:length(Al)
+#         push!(const_idx, prob.El[i].rowval...)
+#     end
+#     const_idx = unique(const_idx)
     const_map = Dict(zip(const_idx, collect(1:length(const_idx))))
 
     numvar = sum(diml) + sum(dimf) + 1
@@ -284,13 +297,13 @@ end
 
 function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
  
-    function getrow(A, E, j)    
+    function getrow(Ak, Ek, j)    
         sub, val = Int[], Float64[]
-        i = findfirst(E.rowval, j)
+        i = findfirst(Ek.rowval, j)
         if i>0
-            k1, k2 = A.colptr[i], A.colptr[i+1]-1
-            sub = A.rowval[k1:k2]
-            val = A.nzval[k1:k2]
+            k1, k2 = Ak.colptr[i], Ak.colptr[i+1]-1
+            sub = view(Ak.rowval, k1:k2)
+            val = view(Ak.nzval, k1:k2)
         else
             sub, val = Int[], Float64[]
         end
@@ -304,7 +317,7 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
         end
         sz
     end
-    
+
     printstream(msg::AbstractString) = print(msg)
 
     # Create a task object and attach log stream printer
@@ -324,13 +337,19 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
         idx_l[j+1] = idx_l[j] + diml[j]
     end
         
-    const_idx = Int[ 1 ]
-    for i=1:length(Al)
-        push!(const_idx, prob.El[i].rowval...)
-    end
+    l = 1
+    for k=1:length(El)
+        l += nnz(El[k])
+    end    
+    const_idx = Array(Int, l)
+    const_idx[1] = 1
+    l = 1
+    for k=1:length(El)
+        const_idx[l + (1:nnz(El[k]))] = El[k].rowval
+        l += nnz(El[k])
+    end    
     
-    const_idx = unique(const_idx)
-    const_map = Dict(zip(const_idx, collect(1:length(const_idx))))
+    const_idx = sort(unique(const_idx))
 
     numvar = sum(diml) + 1
     numcon = length(const_idx)
@@ -364,16 +383,8 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     # Add constraints
     appendcons(task, numcon)
      
-    const_idx = Int[ 1 ]
-    for i=1:length(prob.Al)
-        push!(const_idx, prob.El[i].rowval...)
-    end
-     
-    const_idx = sort(unique(const_idx))
-    const_map = Dict(zip(const_idx, collect(1:length(const_idx))))
-
     f = prob.obj[const_idx]
-
+    
     for (i,k)=enumerate(const_idx)    
         offs = 0
         for j=1:m
@@ -400,42 +411,6 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
             end
         end 
     end
-
-#     for (i,k)=enumerate(const_idx)
-#         lgt = constraint_size(Al, El, k)    
-#         subi = Array(Int, lgt)
-#         vali = Array(Float64, lgt)    
-#         subj_offs = 0
-#         subi_offs = 0
-#         for j=1:m
-#             subj, valj = getrow(Al[j], El[j], k)                
-#             if length(subj) > 0
-#                 subi[subi_offs + (1:length(subj))] = subj+subj_offs
-#                 vali[subi_offs + (1:length(subj))] = valj
-#             end
-#             subj_offs += size(Al[j],1)
-#             subi_offs += length(subj)
-#         end    
-#         if i==1
-#             subi[subi_offs+1] = numvar
-#             vali[subi_offs+1] = 1.0
-#         end
-# 
-#         putarow(task, i, subi, vali)    
-#         putconbound(task, i, MSK_BK_FX, f[i], f[i])                        
-#         #println("CONSTRAINT A($(i)): $(subi), $(vali), b($(i))=$(f[i])")                            
-#        
-#         for j=1:m
-#             subj, valj = getrow(As[j], El[j], k)
-#             if length(subj) >0
-#                 subk, subl = ind2sub( (dimX[j], dimX[j]), subj )
-#                 I = subk .>= subl            
-#                 aij = appendsparsesymmat(task, dimX[j], subk[I], subl[I], valj[I])
-#                 #println("BARAIJ($(i),$(j)): $(subk[I]), $(subl[I]), $(valj[I])")
-#                 putbaraij(task, i, j, [aij], [1.0])            
-#             end
-#         end 
-#     end
                            
     # Input the objective sense (minimize/maximize)
     putobjsense(task,MSK_OBJECTIVE_SENSE_MAXIMIZE)
