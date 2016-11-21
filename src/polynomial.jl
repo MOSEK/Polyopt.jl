@@ -107,14 +107,18 @@ function *{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
         Poly(p1.syms, p2.alpha .+ p1.alpha, p2.c*p1.c[1])
     else
         if p1.m < p2.m
-            r = Poly(p1.syms, p2.alpha .+ p1.alpha[1:1,:], p2.c*p1.c[1])
+            #r = Poly(p1.syms, p2.alpha .+ p1.alpha[1:1,:], p2.c*p1.c[1])
+            r = Poly(p1.syms, p2.alpha .+ view(p1.alpha,1:1,:), p2.c*p1.c[1])
             for k=2:p1.m
-                r = add(r, Poly(p1.syms, p2.alpha .+ p1.alpha[k:k,:], p2.c*p1.c[k]))
+                #r = add(r, Poly(p1.syms, p2.alpha .+ p1.alpha[k:k,:], p2.c*p1.c[k]))
+                r = add(r, Poly(p1.syms, p2.alpha .+ view(p1.alpha,k:k,:), p2.c*p1.c[k]))
             end
         else
-            r = Poly(p1.syms, p1.alpha .+ p2.alpha[1:1,:], p1.c*p2.c[1])
+            #r = Poly(p1.syms, p1.alpha .+ p2.alpha[1:1,:], p1.c*p2.c[1])
+            r = Poly(p1.syms, p1.alpha .+ view(p2.alpha,1:1,:), p1.c*p2.c[1])
             for k=2:p2.m
-                r = add(r, Poly(p1.syms, p1.alpha .+ p2.alpha[k:k,:], p1.c*p2.c[k]))
+                #r = add(r, Poly(p1.syms, p1.alpha .+ p2.alpha[k:k,:], p1.c*p2.c[k]))
+                r = add(r, Poly(p1.syms, p1.alpha .+ view(p2.alpha,k:k,:), p1.c*p2.c[k]))
             end
         end
         simplify(r)
@@ -127,7 +131,9 @@ function ^{T<:Number}(p::Poly{T}, a::Int)
     if a==1 return Poly{T}(p.syms, p.alpha, p.c) end
     if p.m == 1 return Poly{T}(p.syms, p.alpha*a, p.c.^a) end
 
-    powers = Array(Poly{T}, Int(1+ceil(log2(a))))    
+    powers = Array(Poly{T}, Int(1+ceil(log2(a))))
+    
+    @inbounds begin    
     powers[1] = p
     k = 1
     while 2^k<=a
@@ -143,6 +149,8 @@ function ^{T<:Number}(p::Poly{T}, a::Int)
             b += 2^(k-1)
             r = r*powers[k]
         end            
+    end
+    
     end
     r
 end
@@ -168,6 +176,7 @@ isconst{T<:Number}(p::Poly{T}) = (p.m == 0 || p.n == 0)
 
 function A_mul_B!{S<:Number,T<:Number,U<:Number,V<:Number}(alpha::Poly{S}, A::SparseMatrixCSC{T,Int}, x::Array{Poly{U},1}, beta::Poly{V}, y::Array{Poly{V},1})
 
+    @inbounds begin
     for i=1:length(y)
         if beta == zero(y[i])
             y[i] = zero(y[i])
@@ -180,6 +189,7 @@ function A_mul_B!{S<:Number,T<:Number,U<:Number,V<:Number}(alpha::Poly{S}, A::Sp
         for k=A.colptr[j]:A.colptr[j+1]-1
             y[A.rowval[k]] += alpha*A.nzval[k]*x[j]
         end
+    end
     end
     y
 end
@@ -207,63 +217,25 @@ function evalpoly{T<:Number,S<:Number}(p::Poly{T}, x::AbstractArray{S})
 end
 
 # combine identical terms and remove zero terms
-# function simplify{T<:Number}(p::Poly{T})
-# 
-#     lgt = 0
-#     g = Poly{T}(p.syms, copy(p.alpha), copy(p.c))
-#     labeled = falses(g.m)
-#     # labeled monomial terms are either zero, or have been merged with other terms.
-#     for k=1:g.m
-#         if ~labeled[k]
-#             for j=k+1:g.m
-#                 if (~labeled[j] && view(g.alpha,k,:) == view(g.alpha,j,:))
-#                     g.c[k] += g.c[j]
-#                     labeled[j] = true
-#                 end
-#             end
-#             if g.c[k] != zero(T)
-#                 lgt += 1
-#             else
-#                 labeled[k] = true
-#             end
-#         end
-#     end
-# 
-#     if lgt == 0
-#         return zero(Poly{T})
-#     end
-# 
-#     # the unlabeled terms form the reduced polynomial
-#     alpha = Array(Int, lgt, g.n)
-#     c = Array(T, lgt)
-#     lgt = 1
-#     for k=1:g.m
-#         if ~labeled[k]
-#             alpha[lgt,:] = view(g.alpha,k,:)
-#             c[lgt] = g.c[k]
-#             lgt += 1
-#         end
-#     end
-#     perm = sortperm([ view(alpha,i,1:g.n) for i=1:size(alpha,1)], lt=lexless)
-#     Poly{T}(g.syms, alpha[perm,:], c[perm])
-#     #Poly{T}(g.syms, alpha, c)
-# end
-
-# combine identical terms and remove zero terms
 function simplify{T<:Number}(p::Poly{T})
 
     if (p.n == 0 || p.m == 0) 
         return p
     end
     
-    #y = p.alpha*rand(p.n)
-    y = ordermap(p)
-    perm = sortperm(y)
+    #y = ordermap(p)
+    #perm = sortperm(y)
     
+    c = 1:p.n
+    rows = [ view(p.alpha,i,c) for i=1:p.m ]
+    perm = sortperm(rows, order=Base.Order.Lexicographic)
+    y = p.alpha*rand(p.n)
+            
     first = Array(Int, p.m)
     c = Array(T, p.m)
     
     l = 1
+    @inbounds begin
     first[l] = 1
     c[l] = p.c[perm[1]]
     
@@ -278,13 +250,15 @@ function simplify{T<:Number}(p::Poly{T})
     end
 
     I = view(c,1:l) .!= 0    
-    y = Poly{T}(p.syms, p.alpha[perm[view(first,1:l)[I]],:], view(c,1:l)[I])
-    order(y)
+    y = Poly{T}(p.syms, p.alpha[perm[view(first,1:l)[I]],:], view(c,1:l)[I])    
+    end
+    y
 end
 
 function truncate{T<:Number}(p::Poly{T}, threshold=1e-10)
     lgt = 0
     labeled = falses(p.m)
+    
     for k=1:p.m
         if abs(p.c[k]) < threshold
             labeled[k] = true
@@ -310,55 +284,38 @@ end
 
 # ordering for polynomials
 function isless{T<:Number}(p1::Poly{T}, p2::Poly{T})
-#     # sort polynomials by degree
-#     if max(p1.m, p2.m) > 1 return p1.deg < p2.deg end
-# 
-#     # otherwise use graded inverse lex-order for monomials
-#     grilex_isless(p1.alpha, p2.alpha)
     lexless(p1.alpha, p2.alpha)
 end
 
-function ordermap{T<:Number}(p::Poly{T})
-
-    r = zeros(Int, p.n)
-    r[p.n] = 1
-    t = p.deg
-    
-    for l=p.n-1:-1:1
-        r[l] = t+1
-        t += p.deg*r[l] 
-    end 
-    
-    p.alpha*r    
-end
-
-function order{T<:Number}(p::Poly{T})    
-    perm = sortperm(ordermap(p))    
-    Poly{T}(p.syms, p.alpha[perm,:], p.c[perm])
-end
-
+# function ordermap{T<:Number}(p::Poly{T})
 # 
-# function order{T<:Number}(p::Poly{T})
+#     @inbounds begin
 # 
-#     r = zeros(Int, p.n)
+#     r = zeros(Float64, p.n)
 #     r[p.n] = 1
 #     t = p.deg
 #     
 #     for l=p.n-1:-1:1
 #         r[l] = t+1
 #         t += p.deg*r[l] 
-#     end 
+#     end
+#      
+#     end
 #     
-#     perm = sortperm(p.alpha*r)    
+#     p.alpha*r    
+# end
+
+# function order{T<:Number}(p::Poly{T})    
+#     perm = sortperm(ordermap(p))    
 #     Poly{T}(p.syms, p.alpha[perm,:], p.c[perm])
 # end
 
-# function order{T<:Number}(p::Poly{T})
-#     c = 1:size(p.alpha,2)
-#     rows = [ view(p.alpha,i,c) for i=1:size(p.alpha,1) ]
-#     perm = sortperm(rows, order=Base.Order.Lexicographic)
-#     Poly{T}(p.syms, p.alpha[perm,:], p.c[perm])
-# end
+function order{T<:Number}(p::Poly{T})
+    c = 1:size(p.alpha,2)
+    rows = [ view(p.alpha,i,c) for i=1:size(p.alpha,1) ]
+    perm = sortperm(rows, order=Base.Order.Lexicographic)
+    Poly{T}(p.syms, p.alpha[perm,:], p.c[perm])
+end
 
 variables(syms::Symbols) = [Poly{Int}(syms, [zeros(Int,1,k-1) 1 zeros(Int,1,length(syms.names)-k)], [1]) for k=1:length(syms.names)]
 variables{T<:AbstractString}(syms::Vector{T}) = variables(Symbols(syms))

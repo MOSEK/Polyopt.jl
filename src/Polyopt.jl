@@ -150,16 +150,21 @@ end
 
 function basis_index(a::Vector{Int}, degree::Int)
     n = length(a)
-    idx = 1        
+    idx = 1      
+    
+    @inbounds begin  
     for j=1:n-1                
         if a[j] > 0 
-            dj = degree - sum(a[1:j-1])            
+            #dj = degree - sum(a[1:j-1])            
+            dj = degree - sum(view(a,1:j-1))            
             for i=0:a[j]-1            
                 nj = n-j
                 di = dj - i
                 idx += binomial(nj+di, di)
             end
         end
+    end
+    
     end
     idx + a[n]
 end

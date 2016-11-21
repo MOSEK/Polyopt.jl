@@ -105,7 +105,6 @@ function solve_mosek(prob::MomentProb; tolrelgap=1e-10, showlog=true)
     putparam(task, "MSK_IPAR_NUM_THREADS", "4")
     putparam(task, "MSK_DPAR_INTPNT_CO_TOL_REL_GAP", string(tolrelgap))
     
-    return ()
     # Write .task file
     writetask(task, "polyopt.task")
 
