@@ -351,6 +351,7 @@ function bsosprob_chordal{S,T,V}(degree::Int, order::Int, cliques::Array{Array{I
         lbj = zeros(length(ab_d))
         ai, aj, av = Int[], Int[], Float64[]
         lgta = binomial(obj.n+dmax,dmax)
+        
         for (i, ab) in enumerate(ab_d)
             
             # for efficiency reasons we unroll   h_ab = prod(p .^ ab)
@@ -366,9 +367,9 @@ function bsosprob_chordal{S,T,V}(degree::Int, order::Int, cliques::Array{Array{I
             end
             ak = SparseVector(lgta, linear_index(h_ab, dmax), h_ab.c)
 
-            push!(ai, i*ones(ak.nzind)...)
-            push!(aj, ak.nzind...)
-            push!(av, ak.nzval...)         
+            append!(ai, i*ones(ak.nzind))
+            append!(aj, ak.nzind)
+            append!(av, ak.nzval)         
             
             lbj[i] = (sum(ab[2*length(pj)+1:end]) > 0 ? -Inf : 0.0)
         end            

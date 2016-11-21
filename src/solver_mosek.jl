@@ -105,6 +105,7 @@ function solve_mosek(prob::MomentProb; tolrelgap=1e-10, showlog=true)
     putparam(task, "MSK_IPAR_NUM_THREADS", "4")
     putparam(task, "MSK_DPAR_INTPNT_CO_TOL_REL_GAP", string(tolrelgap))
     
+    return ()
     # Write .task file
     writetask(task, "polyopt.task")
 
@@ -291,7 +292,23 @@ function solve_mosek_no_elim(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     f = [ getxxslice(task, MSK_SOL_ITR, idx_f[j], idx_f[j+1]) for j=1:m ]         
     t = getxxslice(task, MSK_SOL_ITR, numvar, numvar+1)[1]
     y = gety(task, MSK_SOL_ITR)
-    X, t, l, f, y    
+    if solsta == MSK_SOL_STA_OPTIMAL
+        return (X, t, l, f, y, "Optimal")
+    elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
+        return (X, t, l, f, y, "Near optimal")
+    elseif solsta == MSK_SOL_STA_DUAL_INFEAS_CER
+        return (X, t, l, f, y, "Dual infeasibility")
+    elseif solsta == MSK_SOL_STA_PRIM_INFEAS_CER
+        return (X, t, l, f, y, "Primal infeasibility")
+    elseif solsta == MSK_SOL_STA_NEAR_DUAL_INFEAS_CER
+        return (X, t, l, f, y, "Near dual infeasibility")
+    elseif solsta == MSK_SOL_STA_NEAR_PRIM_INFEAS_CER
+        return (X, t, l, f, y, "Near primal infeasibility")
+    elseif solsta == MSK_SOL_STA_UNKNOWN
+        return (X, t, l, f, y, "Unknown")
+    else
+        error("Other solution status")
+    end
 end
 
 
@@ -432,7 +449,23 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     l = [ getxxslice(task, MSK_SOL_ITR, idx_l[j], idx_l[j+1]) for j=1:m ]        
     t = getxxslice(task, MSK_SOL_ITR, numvar, numvar+1)[1]
     y = gety(task, MSK_SOL_ITR)
-    X, t, l, y    
+    if solsta == MSK_SOL_STA_OPTIMAL
+        return (X, t, l, y, "Optimal")
+    elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
+        return (X, t, l,  y, "Near optimal")
+    elseif solsta == MSK_SOL_STA_DUAL_INFEAS_CER
+        return (X, t, l,  y, "Dual infeasibility")
+    elseif solsta == MSK_SOL_STA_PRIM_INFEAS_CER
+        return (X, t, l,  y, "Primal infeasibility")
+    elseif solsta == MSK_SOL_STA_NEAR_DUAL_INFEAS_CER
+        return (X, t, l,  y, "Near dual infeasibility")
+    elseif solsta == MSK_SOL_STA_NEAR_PRIM_INFEAS_CER
+        return (X, t, l,  y, "Near primal infeasibility")
+    elseif solsta == MSK_SOL_STA_UNKNOWN
+        return (X, t, l,  y, "Unknown")
+    else
+        error("Other solution status")
+    end   
 end
 
 

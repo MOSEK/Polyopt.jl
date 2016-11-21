@@ -207,79 +207,80 @@ function evalpoly{T<:Number,S<:Number}(p::Poly{T}, x::AbstractArray{S})
 end
 
 # combine identical terms and remove zero terms
-function simplify{T<:Number}(p::Poly{T})
-
-    lgt = 0
-    g = Poly{T}(p.syms, copy(p.alpha), copy(p.c))
-    labeled = falses(g.m)
-    # labeled monomial terms are either zero, or have been merged with other terms.
-    for k=1:g.m
-        if ~labeled[k]
-            for j=k+1:g.m
-                if (~labeled[j] && view(g.alpha,k,:) == view(g.alpha,j,:))
-                    g.c[k] += g.c[j]
-                    labeled[j] = true
-                end
-            end
-            if g.c[k] != zero(T)
-                lgt += 1
-            else
-                labeled[k] = true
-            end
-        end
-    end
-
-    if lgt == 0
-        return zero(Poly{T})
-    end
-
-    # the unlabeled terms form the reduced polynomial
-    alpha = Array(Int, lgt, g.n)
-    c = Array(T, lgt)
-    lgt = 1
-    for k=1:g.m
-        if ~labeled[k]
-            alpha[lgt,:] = view(g.alpha,k,:)
-            c[lgt] = g.c[k]
-            lgt += 1
-        end
-    end
-    #perm = sortperm([ view(alpha,i,1:g.n) for i=1:size(alpha,1)], lt=lexless)
-    #Poly{T}(g.syms, alpha[perm,:], c[perm])
-    Poly{T}(g.syms, alpha, c)
-end
-
-# combine identical terms and remove zero terms
 # function simplify{T<:Number}(p::Poly{T})
 # 
-#     if (p.n == 0 || p.m == 0) 
-#         return p
-#     end
-#     
-#     y = p.alpha*rand(p.n)
-#     perm = sortperm(y)
-#     
-#     first = Array(Int, p.m)
-#     c = Array(T, p.m)
-#     
-#     l = 1
-#     first[l] = 1
-#     c[l] = p.c[perm[1]]
-#     
-#     for k=2:p.m
-#         if y[perm[k]] == y[perm[first[l]]]
-#             c[l] += p.c[perm[k]]
-#         else
-#             l += 1
-#             first[l] = k
-#             c[l] = p.c[perm[k]]
+#     lgt = 0
+#     g = Poly{T}(p.syms, copy(p.alpha), copy(p.c))
+#     labeled = falses(g.m)
+#     # labeled monomial terms are either zero, or have been merged with other terms.
+#     for k=1:g.m
+#         if ~labeled[k]
+#             for j=k+1:g.m
+#                 if (~labeled[j] && view(g.alpha,k,:) == view(g.alpha,j,:))
+#                     g.c[k] += g.c[j]
+#                     labeled[j] = true
+#                 end
+#             end
+#             if g.c[k] != zero(T)
+#                 lgt += 1
+#             else
+#                 labeled[k] = true
+#             end
 #         end
 #     end
 # 
-#     I = view(c,1:l) .!= 0    
-#     y = Poly{T}(p.syms, p.alpha[perm[view(first,1:l)[I]],:], view(c,1:l)[I])
-#     order(y)
+#     if lgt == 0
+#         return zero(Poly{T})
+#     end
+# 
+#     # the unlabeled terms form the reduced polynomial
+#     alpha = Array(Int, lgt, g.n)
+#     c = Array(T, lgt)
+#     lgt = 1
+#     for k=1:g.m
+#         if ~labeled[k]
+#             alpha[lgt,:] = view(g.alpha,k,:)
+#             c[lgt] = g.c[k]
+#             lgt += 1
+#         end
+#     end
+#     perm = sortperm([ view(alpha,i,1:g.n) for i=1:size(alpha,1)], lt=lexless)
+#     Poly{T}(g.syms, alpha[perm,:], c[perm])
+#     #Poly{T}(g.syms, alpha, c)
 # end
+
+# combine identical terms and remove zero terms
+function simplify{T<:Number}(p::Poly{T})
+
+    if (p.n == 0 || p.m == 0) 
+        return p
+    end
+    
+    #y = p.alpha*rand(p.n)
+    y = ordermap(p)
+    perm = sortperm(y)
+    
+    first = Array(Int, p.m)
+    c = Array(T, p.m)
+    
+    l = 1
+    first[l] = 1
+    c[l] = p.c[perm[1]]
+    
+    for k=2:p.m
+        if y[perm[k]] == y[perm[first[l]]]
+            c[l] += p.c[perm[k]]
+        else
+            l += 1
+            first[l] = k
+            c[l] = p.c[perm[k]]
+        end
+    end
+
+    I = view(c,1:l) .!= 0    
+    y = Poly{T}(p.syms, p.alpha[perm[view(first,1:l)[I]],:], view(c,1:l)[I])
+    order(y)
+end
 
 function truncate{T<:Number}(p::Poly{T}, threshold=1e-10)
     lgt = 0
@@ -317,17 +318,46 @@ function isless{T<:Number}(p1::Poly{T}, p2::Poly{T})
     lexless(p1.alpha, p2.alpha)
 end
 
-function order{T<:Number}(p::Poly{T})
-    c = 1:size(p.alpha,2)
-    rows = [ view(p.alpha,i,c) for i=1:size(p.alpha,1) ]
-    perm = sortperm(rows, order=Base.Order.Lexicographic)
+function ordermap{T<:Number}(p::Poly{T})
+
+    r = zeros(Int, p.n)
+    r[p.n] = 1
+    t = p.deg
+    
+    for l=p.n-1:-1:1
+        r[l] = t+1
+        t += p.deg*r[l] 
+    end 
+    
+    p.alpha*r    
+end
+
+function order{T<:Number}(p::Poly{T})    
+    perm = sortperm(ordermap(p))    
     Poly{T}(p.syms, p.alpha[perm,:], p.c[perm])
 end
-    
-# graded inverse lexicographic order (lowest total order first, then reverse lex)
-# function grilex_isless(a::Array{Int}, b::Array{Int})
-#     i, j = sum(a), sum(b)
-#     i == j ? ~lexless(a, b) : i < j
+
+# 
+# function order{T<:Number}(p::Poly{T})
+# 
+#     r = zeros(Int, p.n)
+#     r[p.n] = 1
+#     t = p.deg
+#     
+#     for l=p.n-1:-1:1
+#         r[l] = t+1
+#         t += p.deg*r[l] 
+#     end 
+#     
+#     perm = sortperm(p.alpha*r)    
+#     Poly{T}(p.syms, p.alpha[perm,:], p.c[perm])
+# end
+
+# function order{T<:Number}(p::Poly{T})
+#     c = 1:size(p.alpha,2)
+#     rows = [ view(p.alpha,i,c) for i=1:size(p.alpha,1) ]
+#     perm = sortperm(rows, order=Base.Order.Lexicographic)
+#     Poly{T}(p.syms, p.alpha[perm,:], p.c[perm])
 # end
 
 variables(syms::Symbols) = [Poly{Int}(syms, [zeros(Int,1,k-1) 1 zeros(Int,1,length(syms.names)-k)], [1]) for k=1:length(syms.names)]
