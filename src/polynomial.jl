@@ -7,18 +7,18 @@ immutable Symbols{T<:AbstractString}
 end
 
 immutable Poly{T<:Number}
-    n       :: Int             # number of symbols in monomials
-    m       :: Int             # number of monomials
-    syms    :: Symbols
-    c       :: Array{T,1}      # coefficients in polynomial
-    alpha   :: Array{Int, 2}   # powers of symbols for all monomials
-    deg     :: Int
+    n        :: Int             # number of symbols in monomials
+    m        :: Int             # number of monomials
+    syms     :: Symbols
+    c        :: Array{T,1}      # coefficients in polynomial
+    alpha    :: Array{Int, 2}   # powers of symbols for all monomials
+    deg      :: Int
 
     function Poly(syms::Symbols, alpha::Array{Int,2}, c::Array{T,1})
         m, n = size(alpha)
-        if length(m) == 0 error("Poly must include at least one monomial term") end
         if length(c) != m error("incompatible dimensions") end
-        deg = size(alpha, 1) > 0 ? maximum(sum(alpha,2)) : 0
+        
+        deg = size(alpha, 1) > 0 ? maximum(sum(alpha,2)) : 0        
         new(n, m, syms, c, alpha, deg)
     end
 
@@ -81,7 +81,7 @@ end
 -{S<:Number,T<:Number}(p::Poly{T}, a::S) = p - Poly{S}(p.syms, zeros(Int64, 1, p.n), S[a])
 -{S<:Number,T<:Number}(a::S, p::Poly{T}) = Poly{S}(p.syms, zeros(Int64, 1, p.n), S[a]) - p
 
-*{S<:Number,T<:Number}(p::Poly{S}, a::T) = Poly{promote_type(S,T)}(p.syms, p.alpha, p.c*a)
+*{S<:Number,T<:Number}(p::Poly{S}, a::T) = simplify(Poly{promote_type(S,T)}(p.syms, p.alpha, p.c*a))
 *{S<:Number,T<:Number}(a::S, p::Poly{T}) = *(p::Poly{T}, a::S)
 
 function add{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
@@ -172,7 +172,8 @@ end
 
 conj{T<:Number}(p::Poly{T}) = Poly{T}(p.syms, p.alpha, conj(p.c))
 convert{T<:Number}(::Type{Poly{T}}, a::T) = Poly{T}(convert(T,a))
-isconst{T<:Number}(p::Poly{T}) = (p.m == 0 || p.n == 0)
+#isconst{T<:Number}(p::Poly{T}) = (p.m == 0 || p.n == 0)
+isconst{T<:Number}(p::Poly{T}) = p.n == 0
 
 function A_mul_B!{S<:Number,T<:Number,U<:Number,V<:Number}(alpha::Poly{S}, A::SparseMatrixCSC{T,Int}, x::Array{Poly{U},1}, beta::Poly{V}, y::Array{Poly{V},1})
 
@@ -199,7 +200,8 @@ transpose{T<:Number}(p::Poly{T}) = p
 # promote polynomial to share the same Symbol basis
 function promote_poly{S<:Number,T<:Number}(p1::Poly{S}, p2::Poly{T})
     if (p1.syms == p2.syms) || (isconst(p1) && isconst(p2)) return (p1, p2) end
-    if isconst(p1) && ~isconst(p2)
+    
+    if isconst(p1)  && ~isconst(p2)
         return (Poly{S}(p2.syms, zeros(Int, p1.m, p2.n), p1.c), p2)
     elseif ~isconst(p1) && isconst(p2)
         return (p1, Poly{T}(p1.syms, zeros(Int, p2.m, p1.n), p2.c))
@@ -219,7 +221,12 @@ end
 # combine identical terms and remove zero terms
 function simplify{T<:Number}(p::Poly{T})
 
-    if (p.n == 0 || p.m == 0) 
+    # handle simple cases explicitly to speed function up
+    if p.m == 1 && p.c[1] == zero(T)
+        return Poly{T}(p.syms, Array(Int, 0, p.n), Array(T, 0))
+    end
+    
+    if p.m <= 1 
         return p
     end
     
