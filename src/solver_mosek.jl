@@ -366,6 +366,36 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     end    
     
     const_idx = sort(unique(const_idx))
+    
+    nonzero_markers = falses(length(const_idx))
+    for (i,k)=enumerate(const_idx)
+
+        if (nonzero_markers[i]) continue end        
+    
+        if i==1
+            nonzero_markers[i] = true
+            continue
+        end
+        
+        for j=1:m
+            subj, valj = getrow(Al[j], El[j], k)                
+            if length(subj) > 0
+                nonzero_markers[i] = true
+                break
+            end
+        end
+        
+        if (nonzero_markers[i]) continue end
+            
+        for j=1:m
+            subj, valj = getrow(As[j], El[j], k)
+            if length(subj) >0
+                nonzero_markers[i] = true
+                break            
+            end
+        end 
+    end   
+    const_idx = const_idx[ nonzero_markers ]
 
     numvar = sum(diml) + 1
     numcon = length(const_idx)
@@ -400,7 +430,7 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     appendcons(task, numcon)
      
     f = prob.obj[const_idx]
-    
+       
     for (i,k)=enumerate(const_idx)    
         offs = 0
         for j=1:m
@@ -423,11 +453,11 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
                 subk, subl = ind2sub( (dimX[j], dimX[j]), subj )
                 I = subk .>= subl            
                 aij = appendsparsesymmat(task, dimX[j], subk[I], subl[I], valj[I])
-                putbaraij(task, i, j, [aij], [1.0])            
+                putbaraij(task, i, j, [aij], [1.0])
             end
         end 
     end
-                           
+    
     # Input the objective sense (minimize/maximize)
     putobjsense(task,MSK_OBJECTIVE_SENSE_MAXIMIZE)
 
@@ -447,7 +477,7 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     X = [ symm(getbarxj(task, MSK_SOL_ITR, j), Int(sqrt(size(As[j],1)))) for j=1:m ]    
     l = [ getxxslice(task, MSK_SOL_ITR, idx_l[j], idx_l[j+1]) for j=1:m ]        
     t = getxxslice(task, MSK_SOL_ITR, numvar, numvar+1)[1]
-    y = gety(task, MSK_SOL_ITR)
+    y = sparsevec(const_idx, gety(task, MSK_SOL_ITR), length(prob.obj))
     if solsta == MSK_SOL_STA_OPTIMAL
         return (X, t, l, y, "Optimal")
     elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
