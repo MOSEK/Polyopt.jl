@@ -2,8 +2,7 @@ module Polyopt
 
 export solve_mosek, monomials
 export MomentProb, momentprob, momentprob_chordal, momentprob_chordalembedding 
-export BSOSProb, bsosprob_chordal, bsosprob_chordal2
-export solve_mosek_no_elim
+export BSOSProb, bsosprob_chordal
 
 import Base.^, Base.start, Base.next, Base.done, Base.sub, Base.length
 
@@ -59,60 +58,6 @@ function next(m::MonomialPowers, powers::Vector{Int})
     
     powers, state
 end
-
-# function _merge_monomials{T<:Number}(a::Array{Poly{T},1}, b::Array{Poly{T},1})
-# 
-#     n, m = length(a), length(b)
-#     y = Array(Poly{T}, n + m)
-#     
-#     i, j, k = 1, 1, 1
-#     
-#     while (i <= n) && (j <= m)        
-#         if a[i] <= b[j]
-#             y[k] = a[i]
-#             i += 1
-#         else
-#             y[k] = b[j]
-#             j += 1        
-#         end
-#         k += 1
-#     end
-#     
-#     if i <= n
-#         y[k:n+m] = a[i:n]
-#     else
-#         y[k:n+m] = b[j:m]
-#     end
-#     
-#     y
-# end
-# 
-# # compute all monomials of degree 'deg' or less
-# function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
-# 
-#     if length(vars) == 1        
-#         monoms = Array(Poly{T}, deg+1)
-#         monoms[1] = vars[1]^0
-#         for k=1:deg            
-#             monoms[k+1] = monoms[k] * vars[1] 
-#         end
-#     else
-#         x, tail = vars[1], vars[2:end]
-#         m = monomials(deg, tail)
-#         monoms = m[:]
-# 
-#         t = x
-#         for i=1:deg
-#             monoms = _merge_monomials(monoms, monomials(deg-i, tail)*t)
-#             t = t*x
-#         end
-#     end
-#     monoms
-# end
-# 
-# function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
-#     [ Poly{T}(vars[1].syms, a', [1]) for a in monomialpowers(vars[1].n, deg) ]    
-# end
 
 function monomials{T<:Number}(deg::Int, vars::Array{Poly{T},1})
     n = length(vars)
@@ -352,13 +297,24 @@ function bsosprob_chordal{S,T,V}(degree::Int, order::Int, cliques::Array{Array{I
                   [ symbol_restrict(peq[i], symc, c) for i=Je[j] ])
         
         ab_d = monomialpowers(length(p), degree)
+        #len_ab_d = length(ab_d)
+        len_ab_d = length(ab_d) - (j > 1)
         
-        lbj = zeros(length(ab_d))
+        #lbj = zeros(length(ab_d))
+        lbj = zeros(len_ab_d)
         ai, aj, av = Int[], Int[], Float64[]
         lgta = binomial(obj.n+dmax,dmax)
         
         for (i, ab) in enumerate(ab_d)
-            
+
+            if j > 1
+                if i==1 
+                    continue
+                else
+                    i = i - 1
+                end            
+            end    
+                            
             # for efficiency reasons we unroll   h_ab = prod(p .^ ab)
             h_ab = p[1]^ab[1]
             for l=2:length(ab)
@@ -370,15 +326,17 @@ function bsosprob_chordal{S,T,V}(degree::Int, order::Int, cliques::Array{Array{I
                     h_ab *= p[l]^(ab[l])
                 end
             end
+            #println("h_$(ab)=$(h_ab)")
             ak = SparseVector(lgta, linear_index(h_ab, dmax), h_ab.c)
 
             append!(ai, i*ones(ak.nzind))
             append!(aj, ak.nzind)
-            append!(av, ak.nzval)         
+            append!(av, ak.nzval)
             
             lbj[i] = (sum(ab[2*length(pj)+1:end]) > 0 ? -Inf : 0.0)
         end            
-        push!(Al, sparse(ai, aj, av, length(ab_d), binomial(length(c)+dmax,dmax)))  
+        #push!(Al, sparse(ai, aj, av, length(ab_d), binomial(length(c)+dmax,dmax)))  
+        push!(Al, sparse(ai, aj, av, len_ab_d, binomial(length(c)+dmax,dmax)))  
         push!(lb, lbj)
            
         k = Array(Int, binomial(length(c)+dmax, dmax))
