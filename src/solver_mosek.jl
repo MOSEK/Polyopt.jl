@@ -1,4 +1,16 @@
 using Mosek
+using LinearAlgebra
+
+
+function ind2sub_replacement(a, b)
+    indices = CartesianIndices(a)[b]
+    subk = Array{Int32}(undef, length(indices))
+    subl = Array{Int32}(undef, length(indices))
+    for (i, ind) in enumerate(indices)
+        subk[i], subl[i] = Tuple(ind)
+    end
+    return (subk, subl)
+end
 
 # The 'prob' structure specifies the moment problem
 #
@@ -29,10 +41,10 @@ function solve_mosek(prob::MomentProb; tolrelgap=1e-10, showlog=true)
     barvardim = Int[ sqrt(size(prob.mom[k],1)) for k=1:numbarvar ]
     
     eqdim = Int[ sqrt(size(prob.eq[k],1)) for k=1:length(prob.eq) ]
-    eqidx = Array(Int, length(prob.eq)+1)
+    eqidx = Array{Int}(undef, length(prob.eq)+1)
     eqidx[1] = 0
     for k=1:length(prob.eq)
-        eqidx[k+1] = eqidx[k] + eqdim[k]*(eqdim[k]+1)>>1
+        eqidx[k+1] = eqidx[k] + eqdim[k]*(eqdim[k]+1)/2
     end
     numvar = 1 + eqidx[ end ]
     
@@ -40,21 +52,21 @@ function solve_mosek(prob::MomentProb; tolrelgap=1e-10, showlog=true)
     appendvars(task, Int32(numvar))
 
     putvarboundslice(task, 1, numvar+1,
-                     round(Int32, [ MSK_BK_FR  for i in 1:numvar ]),
+                     [ MSK_BK_FR  for i in 1:numvar ],
                      [ -Inf       for i in 1:numvar ],
                      [ +Inf       for i in 1:numvar ])
 
     putcj(task, 1, 1.0)
 
     # Append matrix variables of sizes in 'BARVARDIM'.
-    appendbarvars(task, round(Int32,barvardim))
+    appendbarvars(task, barvardim)
 
     # Add constraints
     numconst = 1
     appendcons(task, 1)
     putaij(task, 1, 1, 1.0)
     
-    I = Array(Int,0)
+    I = Array{Int}(undef,0)
     for i=1:numcon
 
         added_const = ( i == 1);
@@ -67,8 +79,10 @@ function solve_mosek(prob::MomentProb; tolrelgap=1e-10, showlog=true)
                 if !added_const
                     appendcons(task, 1)
                     added_const = true
-                end                
-                subk, subl = ind2sub( (nj, nj), prob.mom[j].rowval[k1:k2] )
+                end
+                    
+                subk, subl = ind2sub_replacement((nj,nj), prob.mom[j].rowval[k1:k2])
+                    
 		        trilidx = subk .>= subl            
                 aij = appendsparsesymmat(task, nj, subk[trilidx], subl[trilidx], prob.mom[j].nzval[k1:k2][trilidx])
                 putbaraij(task, numconst, j, [aij], [1.0])
@@ -83,9 +97,10 @@ function solve_mosek(prob::MomentProb; tolrelgap=1e-10, showlog=true)
                     added_const = true
                 end                
 
-                subk, subl = ind2sub( (eqdim[j], eqdim[j]), prob.eq[j].rowval[k1:k2] )
+                subk, subl = ind2sub_replacement((eqdim[j], eqdim[j]), prob.eq[j].rowval[k1:k2])
                 trilidx = subk .>= subl
-                subj = trilind( prob.eq[j].rowval[k1:k2][trilidx], eqdim[j] ) + eqidx[j] + 1
+                subj = trilind( prob.eq[j].rowval[k1:k2][trilidx], eqdim[j] ) .+ (eqidx[j] + 1)
+
                 putaijlist(task, numconst*ones(Int, length(subj)), subj, prob.eq[j].nzval[k1:k2][trilidx])
 #                 subj = trilind( prob.eq[j].rowval[k1:k2], eqdim[j] ) + eqidx[j] + 1
 #                 putaijlist(task, numconst*ones(Int, length(subj)), subj, prob.eq[j].nzval[k1:k2])
@@ -125,16 +140,16 @@ function solve_mosek(prob::MomentProb; tolrelgap=1e-10, showlog=true)
     
     if solsta == MSK_SOL_STA_OPTIMAL
         return (X, Z, t, y, "Optimal")
-    elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
-        return (X, Z, t, y, "Near optimal")
+#    elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
+#        return (X, Z, t, y, "Near optimal")
     elseif solsta == MSK_SOL_STA_DUAL_INFEAS_CER
         return (X, Z, t, y, "Dual infeasibility")
     elseif solsta == MSK_SOL_STA_PRIM_INFEAS_CER
         return (X, Z, t, y, "Primal infeasibility")
-    elseif solsta == MSK_SOL_STA_NEAR_DUAL_INFEAS_CER
-        return (X, Z, t, y, "Near dual infeasibility")
-    elseif solsta == MSK_SOL_STA_NEAR_PRIM_INFEAS_CER
-        return (X, Z, t, y, "Near primal infeasibility")
+#    elseif solsta == MSK_SOL_STA_NEAR_DUAL_INFEAS_CER
+#        return (X, Z, t, y, "Near dual infeasibility")
+#    elseif solsta == MSK_SOL_STA_NEAR_PRIM_INFEAS_CER
+#        return (X, Z, t, y, "Near primal infeasibility")
     elseif solsta == MSK_SOL_STA_UNKNOWN
         return (X, Z, t, y, "Unknown")
     else
@@ -142,7 +157,7 @@ function solve_mosek(prob::MomentProb; tolrelgap=1e-10, showlog=true)
     end
 end
 
-trilind(k::Vector{Int}, n::Int) = Int[i + (j-1)*(n-1) - (j-1)*(j-2)>>1 for (i,j) = zip(ind2sub((n, n), k)...) ]
+trilind(k::Vector{Int}, n::Int) = Int[i + (j-1)*(n-1) - (j-1)*(j-2)/2 for (i,j) = zip(ind2sub_replacement((n, n),k)...) ]
 
 function solve_mosek_no_elim(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     
@@ -176,7 +191,7 @@ function solve_mosek_no_elim(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     for k=1:length(El)
         l += nnz(El[k])
     end    
-    const_idx = Array(Int, l)
+    const_idx = Array{Int,1}(undef, l)
     const_idx[1] = 1
     l = 1
     for k=1:length(El)
@@ -240,7 +255,7 @@ function solve_mosek_no_elim(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
             
             k1, k2 = As[j].colptr[i], As[j].colptr[i+1]-1
             if k2>=k1
-                subk, subl = ind2sub( (dimX[j], dimX[j]), As[j].rowval[k1:k2] )
+                subk, subl = ind2sub_replacement( (dimX[j], dimX[j]), As[j].rowval[k1:k2] )
                 I = subk .>= subl            
                 aij = appendsparsesymmat(task, dimX[j], subk[I], subl[I], As[j].nzval[k1:k2][I])
                 #println("BARAIJ($(idx_const+i-1),$(j)): $(subk[I]), $(subl[I]), $(As[j].nzval[k1:k2][I])")
@@ -293,16 +308,16 @@ function solve_mosek_no_elim(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     y = gety(task, MSK_SOL_ITR)
     if solsta == MSK_SOL_STA_OPTIMAL
         return (X, t, l, f, y, "Optimal")
-    elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
-        return (X, t, l, f, y, "Near optimal")
+#    elseif solsta == MSK_SOL_STA_NEAR_OPTIMAL
+#        return (X, t, l, f, y, "Near optimal")
     elseif solsta == MSK_SOL_STA_DUAL_INFEAS_CER
         return (X, t, l, f, y, "Dual infeasibility")
     elseif solsta == MSK_SOL_STA_PRIM_INFEAS_CER
         return (X, t, l, f, y, "Primal infeasibility")
-    elseif solsta == MSK_SOL_STA_NEAR_DUAL_INFEAS_CER
-        return (X, t, l, f, y, "Near dual infeasibility")
-    elseif solsta == MSK_SOL_STA_NEAR_PRIM_INFEAS_CER
-        return (X, t, l, f, y, "Near primal infeasibility")
+#    elseif solsta == MSK_SOL_STA_NEAR_DUAL_INFEAS_CER
+#        return (X, t, l, f, y, "Near dual infeasibility")
+#    elseif solsta == MSK_SOL_STA_NEAR_PRIM_INFEAS_CER
+#        return (X, t, l, f, y, "Near primal infeasibility")
     elseif solsta == MSK_SOL_STA_UNKNOWN
         return (X, t, l, f, y, "Unknown")
     else
@@ -357,7 +372,7 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
     for k=1:length(El)
         l += nnz(El[k])
     end    
-    const_idx = Array(Int, l)
+    const_idx = Array{Int,1}(undef, l)
     const_idx[1] = 1
     l = 1
     for k=1:length(El)
@@ -450,7 +465,7 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
         for j=1:m
             subj, valj = getrow(As[j], El[j], k)
             if length(subj) >0
-                subk, subl = ind2sub( (dimX[j], dimX[j]), subj )
+                subk, subl = ind2sub_replacement( (dimX[j], dimX[j]), subj )
                 I = subk .>= subl            
                 aij = appendsparsesymmat(task, dimX[j], subk[I], subl[I], valj[I])
                 putbaraij(task, i, j, [aij], [1.0])
@@ -498,14 +513,14 @@ function solve_mosek(prob::BSOSProb; tolrelgap=1e-10, showlog=true)
 end
 
 
-function symm{T<:Number}(x::Array{T,1}, n::Int)
+function symm(x::Array{T,1}, n::Int) where {T<:Number}
     X = zeros(n,n)
     k = 0
     for j=1:n
-        X[j:n,j] = x[k + (1:n-j+1)]
+        X[j:n,j] = x[k .+ (1:n-j+1)]
         k += n-j+1
     end
 
-    full(Symmetric(X,:L))
+    Matrix(Symmetric(X,:L))
 end
 

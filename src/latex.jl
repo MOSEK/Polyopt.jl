@@ -1,4 +1,6 @@
-texstring{T<:Number}(a::T) = string(a)
+using Printf
+
+texstring(a::T) where {T<:Number} = string(a)
 texstring(a::Float64) = string(@sprintf("%1.2f",a))
 texstring(a::Rational) = ( a.den == one(a) ? string(a.num) : string("\\frac{", a.num, "}{", a.den, "}") )
 
@@ -57,7 +59,7 @@ function latex(p::Poly, imap::Dict{Array{Int,2},Int}, texsymbols::Array{String,1
     s
 end
 
-function latex{T}(M::Array{Poly{T}}, imap::Dict{Array{Int,2},Int}, texsymbols::Array{String,1}, matrixlimit = 10)
+function latex(M::Array{Poly{T}}, imap::Dict{Array{Int,2},Int}, texsymbols::Array{String,1}, matrixlimit = 10) where {T<:Number}
     n = size(M,1)
     s = "\\left[\n\\begin{array}{*{$(min(matrixlimit,n))}c}\n"
     if matrixlimit < n
@@ -113,7 +115,7 @@ end
 function latex_dual(prob::MomentProb, vectorizednames::Bool, matrixlimit::Int)
 
     imap = Polyopt.indexmap(prob.basis)
-    syms = Array(String, length(imap))
+    syms = Array{String,1}(undef, length(imap))
 
     if vectorizednames == true
         for (key,k) = imap
@@ -135,8 +137,8 @@ function latex_probstats(prob::MomentProb)
     avgblksize  = int(mean(sdpblksize))
 
     eqsize      = [ int(sqrt(size(m,1))) for m=prob.eq ]
-    numfree     = sum(Int[ n*(n+1) >> 1 for n=eqsize ])
-    numvar      = sum([ n*(n+1) >> 1 for n=sdpblksize ]) + numfree
+    numfree     = sum(Int[ n*(n+1)/2 for n=eqsize ])
+    numvar      = sum([ n*(n+1)/2 for n=sdpblksize ]) + numfree
     numcon      = length(prob.basis)-1
 
     maxrhs  = maximum(prob.obj)
